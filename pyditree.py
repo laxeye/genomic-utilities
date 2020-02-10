@@ -24,7 +24,7 @@ def tableToDistDict(filename):
 
 	while line:
 		line.rstrip("\n\r\t ")
-		(query, ref, ani, _) = line.split("\t")
+		(query, ref, ani) = line.split("\t")[0:3]
 		if query not in ids:
 			dists[query] = {}
 			ids.append(query)
@@ -85,12 +85,20 @@ def printDistAsCSV(d):
 
 def heatmapFromDist(dist_dict):
 	dist_arr = np.array( distDictToArray(dist_dict) )
-
-	if args.sort_heatmap:
-		dist_arr = dist_arr[np.argsort( np.sum(dist_arr, 0) ), :]
-		dist_arr = dist_arr[:, np.argsort( np.sum(dist_arr, 0) )]
+	names = np.array( list(dist_dict) )
 
 	fig, ax = plt.subplots()
+	ax.set_yticks(np.arange(len(dist_dict)))
+
+	if args.sort_heatmap:
+		ordnung = np.argsort( np.sum(dist_arr, 0) )
+		dist_arr = dist_arr[ordnung, ]
+		dist_arr = dist_arr[:, ordnung ]
+		names = names[ordnung]
+
+	ax.set_yticklabels(names)
+	plt.setp(ax.get_yticklabels(), rotation=30, ha="right", rotation_mode="anchor")
+
 	im = ax.imshow(dist_arr, cmap=cm.RdGy)
 	ax.set_title("ANI distance between genomes")
 	plt.colorbar(im)
@@ -116,7 +124,8 @@ parser.add_argument("-t", "--ani_table", help="Tab separated table of ANI values
 parser.add_argument("-p", "--prefix", help="Tab separated table of ANI values", default="newprefix")
 parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ or none", default="UPGMA")
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
-parser.add_argument("-s", "--sort_heatmap", help="Sort heatmap rows and columns", action="store_true")
+parser.add_argument("-s", "--sort_heatmap", help="Sort heatmap rows and columns by cummulative distance", action="store_true")
+parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
 args = parser.parse_args()
 
 # Parse input
@@ -138,11 +147,14 @@ pdm = pdmFromDistDict(dist_dict)
 if args.mode == "UPGMA":
 	upgma_tree = pdm.upgma_tree()
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.unrooted.nwk" % args.prefix, 'w'))
-	print(upgma_tree.as_ascii_plot(plot_metric='length'))
+	if args.ascii_tree:
+		print(upgma_tree.as_ascii_plot(plot_metric='length'))
 	upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
 elif ars.mode == "NJ":
 	nj_tree = pdm.nj_tree()
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.unrooted.nwk" % args.prefix, 'w'))
+	if args.ascii_tree:
+		print(nj_tree.as_ascii_plot(plot_metric='length'))
 	nj_tree.reroot_at_midpoint(suppress_unifurcations = False)
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.rooted.nwk" % args.prefix, 'w'))
