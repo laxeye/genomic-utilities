@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import dendropy
 import sys
 import io
@@ -118,11 +119,11 @@ def pdmFromDistDict(dist_dict):
 	return pdm
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distances.")
 parser.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
 parser.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
 parser.add_argument("-p", "--prefix", help="Tab separated table of ANI values", default="newprefix")
-parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ or none", default="UPGMA")
+parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ, both or none", default="UPGMA")
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 parser.add_argument("-s", "--sort_heatmap", help="Sort heatmap rows and columns by cummulative distance", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
@@ -144,14 +145,14 @@ if args.heatmap:
 # Calculate Dendropy compatible phylogenetic distance matrix
 pdm = pdmFromDistDict(dist_dict)
 
-if args.mode == "UPGMA":
+if (args.mode == "UPGMA" or args.mode == "both"):
 	upgma_tree = pdm.upgma_tree()
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
 		print(upgma_tree.as_ascii_plot(plot_metric='length'))
 	upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
-elif ars.mode == "NJ":
+elif (args.mode == "NJ" or args.mode == "both"):
 	nj_tree = pdm.nj_tree()
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
