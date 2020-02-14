@@ -7,9 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
-#from dendropy.datamodel import taxonmodel as taxonmodel
-#from dendropy.calculate import phylogeneticdistance as phylodist
-#from dendropy.utility import container
+from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
 
 #Set distance for unknown (low) ANI
 NA_DISTANCE = 0.3
@@ -84,26 +82,36 @@ def printDistAsCSV(d):
 
 	return inmem
 
+def plotDendrogram(l, names):
+	plt.figure(figsize=(10, 6), dpi=300)
+	plt.title("ANI-derived dendrogram")
+	dendrogram(l, orientation='top', labels=names, distance_sort='descending', show_leaf_counts=True)
+	plt.savefig("%s.dendrogram.png" % args.prefix, dpi=300)
+	plt.savefig("%s.dendrogram.svg" % args.prefix)
+
 def heatmapFromDist(dist_dict):
 	dist_arr = np.array( distDictToArray(dist_dict) )
 	names = np.array( list(dist_dict) )
-
+	l = linkage(dist_arr)
 	fig, ax = plt.subplots()
 	ax.set_yticks(np.arange(len(dist_dict)))
 
-	if args.sort_heatmap:
-		ordnung = np.argsort( np.sum(dist_arr, 0) )
-		dist_arr = dist_arr[ordnung, ]
-		dist_arr = dist_arr[:, ordnung ]
-		names = names[ordnung]
+	order = leaves_list(l)
+	dist_arr = dist_arr[order, ]
+	dist_arr = dist_arr[:, order]
+	names = names[order]
 
-	ax.set_yticklabels(names)
-	plt.setp(ax.get_yticklabels(), rotation=30, ha="right", rotation_mode="anchor")
+	ax.set_yticklabels(names,fontdict={'fontsize':'xx-small'})
+	plt.setp(ax.get_yticklabels(), rotation=0, ha="right", rotation_mode="anchor")
 
 	im = ax.imshow(dist_arr, cmap=cm.RdGy)
 	ax.set_title("ANI distance between genomes")
 	plt.colorbar(im)
-	plt.savefig("%s.png" % args.prefix, dpi=180)
+	plt.savefig("%s.heatmap.png" % args.prefix, dpi=300)
+	plt.savefig("%s.heatmap.svg" % args.prefix)
+
+	if args.plot_dendrogram:
+		plotDendrogram(l, names)
 
 def pdmFromDistDict(dist_dict):
 	outputtmp = printDistAsCSV(dist_dict)
@@ -125,8 +133,8 @@ parser.add_argument("-t", "--ani_table", help="Tab separated table of ANI values
 parser.add_argument("-p", "--prefix", help="Tab separated table of ANI values", default="newprefix")
 parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ, both or none", default="UPGMA")
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
-parser.add_argument("-s", "--sort_heatmap", help="Sort heatmap rows and columns by cummulative distance", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
+parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
 args = parser.parse_args()
 
 # Parse input
@@ -149,13 +157,13 @@ if (args.mode == "UPGMA" or args.mode == "both"):
 	upgma_tree = pdm.upgma_tree()
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
-		print(upgma_tree.as_ascii_plot(plot_metric='length'))
+		print(upgma_tree.as_ascii_plot(plot_metric='length'), file = open("%s.upgma.unrooted.txt" % args.prefix, 'w'))
 	upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
-elif (args.mode == "NJ" or args.mode == "both"):
+if (args.mode == "NJ" or args.mode == "both"):
 	nj_tree = pdm.nj_tree()
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
-		print(nj_tree.as_ascii_plot(plot_metric='length'))
+		print(nj_tree.as_ascii_plot(plot_metric='length'), file = open("%s.nj.unrooted.txt" % args.prefix, 'w'))
 	nj_tree.reroot_at_midpoint(suppress_unifurcations = False)
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.rooted.nwk" % args.prefix, 'w'))
