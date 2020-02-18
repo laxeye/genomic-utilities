@@ -3,10 +3,9 @@ import dendropy
 import sys
 import io
 import argparse
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import numpy as np
+import numpy.array, numpy.arange
 from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
 
 #Set distance for unknown (low) ANI
@@ -90,11 +89,11 @@ def plotDendrogram(l, names):
 	plt.savefig("%s.dendrogram.svg" % args.prefix)
 
 def heatmapFromDist(dist_dict):
-	dist_arr = np.array( distDictToArray(dist_dict) )
-	names = np.array( list(dist_dict) )
+	dist_arr = numpy.array( distDictToArray(dist_dict) )
+	names = numpy.array( list(dist_dict) )
 	l = linkage(dist_arr)
 	fig, ax = plt.subplots()
-	ax.set_yticks(np.arange(len(dist_dict)))
+	ax.set_yticks(numpy.arange(len(dist_dict)))
 
 	order = leaves_list(l)
 	dist_arr = dist_arr[order, ]
