@@ -129,7 +129,7 @@ def pdmFromDistDict(dist_dict):
 parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distances.")
 parser.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
 parser.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
-parser.add_argument("-p", "--prefix", help="Tab separated table of ANI values", default="newprefix")
+parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
 parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ, both or none", default="UPGMA")
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")

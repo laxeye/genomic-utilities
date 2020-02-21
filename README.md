@@ -12,7 +12,7 @@ Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distanc
 
 -t FILE, --ani_table FILE               Tab separated table of ANI values
 
--p STRING, --prefix STRING              Tab separated table of ANI values
+-p STRING, --prefix STRING              Prefix for output files
 
 -m MODE, --mode MODE                    Tree inference method: UPGMA (default), NJ, both or none
 
