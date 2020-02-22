@@ -2,10 +2,11 @@
 import dendropy
 import sys
 import io
+import subprocess
 import argparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import numpy.array, numpy.arange
+from numpy import array, arange
 from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
 
 #Set distance for unknown (low) ANI
@@ -89,11 +90,11 @@ def plotDendrogram(l, names):
 	plt.savefig("%s.dendrogram.svg" % args.prefix)
 
 def heatmapFromDist(dist_dict):
-	dist_arr = numpy.array( distDictToArray(dist_dict) )
-	names = numpy.array( list(dist_dict) )
+	dist_arr = array( distDictToArray(dist_dict) )
+	names = array( list(dist_dict) )
 	l = linkage(dist_arr)
 	fig, ax = plt.subplots()
-	ax.set_yticks(numpy.arange(len(dist_dict)))
+	ax.set_yticks(arange(len(dist_dict)))
 
 	order = leaves_list(l)
 	dist_arr = dist_arr[order, ]
@@ -125,10 +126,35 @@ def pdmFromDistDict(dist_dict):
 	
 	return pdm
 
+def checkExec(bin):
+	try:
+		rc = subprocess.run([bin,'-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode
+	except Exception as e:
+		raise e
+	else:
+		return True if rc == 0 else False
+
+def runAniRb:
+	pass
+
+def runFastaANI:
+	pass
+
+
 
 parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distances.")
-parser.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
-parser.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
+group.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
+group.add_argument("--anirb", help="Run ani.rb (slow)", action="store_true")
+group.add_argument("--fastani", help="Run fastANI (fast)", action="store_true")
+'''
+ANI calculation
+ingroup = parser.add_mutually_exclusive_group()
+ingroup.add_argument("--input_list", help="List of genomes with full path for ANI calculation")
+ingroup.add_argument("--input_dir", help="List of genomes with full path for ANI calculation")
+'''
+parser.add_argument("--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
 parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ, both or none", default="UPGMA")
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
@@ -136,14 +162,22 @@ parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", acti
 parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
 args = parser.parse_args()
 
+if args.anirb:
+	if checkExec("ani.rb"):
+		pass
+	else:
+		print("Failed to run \'ani.rb\'")
+if args.fastani:
+	if checkExec("fastANI"):
+		pass
+	else:
+		print("Failed to run \'fastANI\'")
+
 # Parse input
 if args.low_triangular_matrix:
 	dist_dict = ltmToDistDict(args.low_triangular_matrix)
-elif args.ani_table:
+if args.ani_table:
 	dist_dict = tableToDistDict(args.ani_table)
-else:
-	print("You should provide ANI values.\nPlease run %s -h" % sys.argv[0])
-	exit(1)
 
 # Draw a heatmap with pyplot
 if args.heatmap:
