@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import time
 import dendropy
 import sys
 import io
+import os
 import subprocess
 import argparse
 import matplotlib.pyplot as plt
@@ -9,11 +11,16 @@ from matplotlib import cm
 from numpy import array, arange
 from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
 
+
 #Set distance for unknown (low) ANI
 NA_DISTANCE = 0.3
+#PNG resolution
+PNG_DPI = 300
+
 
 def aniToDistance(ani):
 	return NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
+
 
 def tableToDistDict(filename):
 	infile = open(filename, 'r')
@@ -24,13 +31,17 @@ def tableToDistDict(filename):
 	while line:
 		line.rstrip("\n\r\t ")
 		(query, ref, ani) = line.split("\t")[0:3]
+		query = query.split("/")[-1]
+		ref = ref.split("/")[-1]
 		if query not in ids:
 			dists[query] = {}
 			ids.append(query)
 		dists[query][ref] = aniToDistance(ani)
 		line = infile.readline()
 
+	infile.close()
 	return dists
+
 
 def ltmToDistDict(filename):
 	lines = open(filename, 'r').read().split("\n")
@@ -41,7 +52,7 @@ def ltmToDistDict(filename):
 	for line in lines:
 		if len(line) == 0: break
 		l = line.rstrip("\r\n\t ").split('\t')
-		name = l.pop(0)
+		name = l.pop(0).split("/")[-1]
 		ids.append(name)
 		dists[name] = {}
 		for i in range(len(l)):
@@ -49,52 +60,60 @@ def ltmToDistDict(filename):
 
 	return dists
 
-def distDictToArray(d):
+
+def distDictToList(d):
+	#Creates two-dimensional list from dict
 	keys = list(d)
-	a = []
+	ani_list = []
 
 	for x in range(len(keys)):
 		s = []
 		for y in range(len(keys)):
-			v = 0
+			value = 0
 			if x != y:
 				(i, j) = (y, x) if x < y else (x, y) # Compatibility with LT-matrices
 				if ( keys[i] in d and keys[j] in d[keys[i]] ):
-					v = d[keys[i]][keys[j]] 
+					value = d[keys[i]][keys[j]] 
 				else:
-					v = NA_DISTANCE # N/A tmp value
-			s.append(v)
-		a.append(s)
+					value = NA_DISTANCE
+			s.append(value)
+		ani_list.append(s)
 
-	return a
+	return ani_list
+
 
 def printDistAsCSV(d):
 	inmem = io.StringIO()
 	keys = list(d)
 	# 1st field [0,0] must be empty for Dendropy compatibility
 	print("," + ",".join(keys), file = inmem)
-	a = distDictToArray(d)
+	ani_list = distDictToList(d)
 
 	for x in range(len(keys)):
-		t = list(map(lambda x: str(x), a[x]))
+		t = list(map(lambda x: str(x), ani_list[x]))
 		t.insert(0, keys[x])
 		print(",".join(t), file = inmem)
 
 	return inmem
 
+
 def plotDendrogram(l, names):
-	plt.figure(figsize=(10, 6), dpi=300)
+	plt.figure(figsize=(10, 6), dpi=PNG_DPI)
 	plt.title("ANI-derived dendrogram")
 	dendrogram(l, orientation='top', labels=names, distance_sort='descending', show_leaf_counts=True)
-	plt.savefig("%s.dendrogram.png" % args.prefix, dpi=300)
+	plt.savefig("%s.dendrogram.png" % args.prefix, dpi=PNG_DPI)
 	plt.savefig("%s.dendrogram.svg" % args.prefix)
 
+
 def heatmapFromDist(dist_dict):
-	dist_arr = array( distDictToArray(dist_dict) )
+	#Set colors for heatmap
+	COLOR_MAP = cm.RdGy
+
+	dist_arr = array( distDictToList(dist_dict) )
 	names = array( list(dist_dict) )
 	l = linkage(dist_arr)
 	fig, ax = plt.subplots()
-	ax.set_yticks(arange(len(dist_dict)))
+	ax.set_yticks( arange( len(dist_dict) ) )
 
 	order = leaves_list(l)
 	dist_arr = dist_arr[order, ]
@@ -104,76 +123,111 @@ def heatmapFromDist(dist_dict):
 	ax.set_yticklabels(names,fontdict={'fontsize':'xx-small'})
 	plt.setp(ax.get_yticklabels(), rotation=0, ha="right", rotation_mode="anchor")
 
-	im = ax.imshow(dist_arr, cmap=cm.RdGy)
+	im = ax.imshow(dist_arr, cmap=COLOR_MAP)
 	ax.set_title("ANI distance between genomes")
 	plt.colorbar(im)
-	plt.savefig("%s.heatmap.png" % args.prefix, dpi=300)
+	plt.savefig("%s.heatmap.png" % args.prefix, dpi=PNG_DPI)
 	plt.savefig("%s.heatmap.svg" % args.prefix)
 
 	if args.plot_dendrogram:
 		plotDendrogram(l, names)
 
+
 def pdmFromDistDict(dist_dict):
+	#Returns phylogenetic distance matrix object from Dendropy
 	outputtmp = printDistAsCSV(dist_dict)
-	
 	outputtmp.seek(0) # Return to the first line
-	print(outputtmp.read(), file = open("%s.dp.distances.csv" % args.prefix, 'w'))
+	print(outputtmp.read(), file = open("%s.distances.csv" % args.prefix, 'w'))
 	
 	outputtmp.seek(0) # Return to the first line
 	pdm = dendropy.PhylogeneticDistanceMatrix.from_csv(src=outputtmp, delimiter=",")
-	
 	outputtmp.close()
 	
 	return pdm
 
+
 def checkExec(bin):
 	try:
-		rc = subprocess.run([bin,'-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode
+		return subprocess.run([bin,'-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode is not None
 	except Exception as e:
 		raise e
-	else:
-		return True if rc == 0 else False
 
-def runAniRb:
-	pass
 
-def runFastaANI:
-	pass
-
+def listToFile(l):
+	name = "%s.lst" % args.prefix
+	f = open(name,'w')
+	print("\n".join(l), file=f)
+	f.close()
+	return name
 
 
 parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distances.")
+
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
 group.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
-group.add_argument("--anirb", help="Run ani.rb (slow)", action="store_true")
-group.add_argument("--fastani", help="Run fastANI (fast)", action="store_true")
-'''
-ANI calculation
+group.add_argument("--anirb", help="Calculate ANI with ani.rb (slow). --input_list/--input_dir required", action="store_true")
+group.add_argument("--fastani", help="Calculate ANI with fastANI (fast). --input_list/--input_dir required", action="store_true")
+
 ingroup = parser.add_mutually_exclusive_group()
 ingroup.add_argument("--input_list", help="List of genomes with full path for ANI calculation")
-ingroup.add_argument("--input_dir", help="List of genomes with full path for ANI calculation")
-'''
+ingroup.add_argument("--input_dir", help="Path to directory containig genomes for ANI calculation")
+
 parser.add_argument("--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
 parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ, both or none", default="UPGMA")
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
 parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
+
 args = parser.parse_args()
 
-if args.anirb:
-	if checkExec("ani.rb"):
-		pass
-	else:
-		print("Failed to run \'ani.rb\'")
-if args.fastani:
-	if checkExec("fastANI"):
-		pass
-	else:
-		print("Failed to run \'fastANI\'")
 
-# Parse input
+if (args.anirb or args.fastani):
+	binary = "ani.rb" if args.anirb else "fastANI"
+	if checkExec(binary) == False:
+		print("Failed to run \'%s\'" % binary)
+		exit(1)
+	file_list =[]
+	if args.input_list:
+		f = open(args.input_list)
+		start = time.process_time()
+		for l in f.readlines():
+			l = l.strip()
+			if (os.path.exists(l) and l.split(".")[-1] == args.extension):
+				file_list.append(os.path.realpath(l))
+	elif args.input_dir:
+		for file in os.scandir(os.path.realpath(args.input_dir)):
+			if (file.is_file() and file.name.split(".")[-1] == args.extension):
+				file_list.append(file.path)
+	else:
+		print("Genomes are not provided. Exiting.")
+		exit(1)
+	
+	if args.anirb:
+		results = []
+		print("Running ani.rb", file = sys.stderr)
+		for i in range(0, len(file_list)):
+			for j in range(i+1, len(file_list)):
+				cmd = ["ani.rb", "-1", file_list[i], "-2", file_list[j], "-a", "-q"]
+				r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
+				if len(r) > 0:
+					results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
+		file_resulsts = "%s.tsv" % args.prefix
+		print("\n".join(results), file = open(file_resulsts, "w"))
+
+	if args.fastani:
+		print("Running fastANI", file = sys.stderr)
+		file_list_name = listToFile(file_list)
+		file_resulsts = "%s.tsv" % args.prefix
+		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_resulsts]
+		rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
+		if rc != 0:
+			print("fastANI didn't work correctly.")
+			exit(1)
+	dist_dict = tableToDistDict(file_resulsts)
+
+# Parse input files
 if args.low_triangular_matrix:
 	dist_dict = ltmToDistDict(args.low_triangular_matrix)
 if args.ani_table:
