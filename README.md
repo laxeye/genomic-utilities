@@ -1,10 +1,14 @@
-## `ani_distance_viz.py`
+# `ani_distance_viz.py`
 
-Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distances.
+Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide identity)-derived genomic distances.
 
-### Usage
 
-`ani_distance_viz.py [-h] [-l LOW_TRIANGULAR_MATRIX] [-t ANI_TABLE] [-p PREFIX] [-m MODE] [-H] [-A] [-d]`
+## Usage
+
+`ani_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --fastani) [--input_list INPUT_LIST | --input_dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [-H] [-A] [-d]`
+
+
+### Command-line options
 
 -h, --help                              Show this help message and exit
 
@@ -32,18 +36,22 @@ Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distanc
 
 -d, --plot_dendrogram                   Plot a dendrogram
 
-#### Input files
+
+### Input files
 
 **Low triangular matrix** - matrix produced by [fastANI](https://github.com/ParBLiSS/FastANI) with "--matrix" option.
 
-**ANI table** - tab-separated file of such structure: `Genome1    Genome2    ANI[   ...]`
+**ANI table** - tab-separated file of such structure: 
+
+`Genome1    Genome2    ANI[   ...]`
 
 May be produced by e.g. [ani.rb](https://github.com/lmrodriguezr/enveomics):
+
 `for i in *fna; do for j in *fna; do echo -ne "$i\t$j\t"; ani.rb -q -a -1 $i -2 $j 2>/dev/null; done; done >> ani.rb.tsv`
 
 
 Or by [fastANI](https://github.com/ParBLiSS/FastANI).
 
 
-If you have ani.rb or fastANI installed in Your environment you may use --anirb or --fastani to calculate ANI for list of genomes using *--input_list* or folder containing genomes *--input_dir*. Genomes should have FASTA format, You may provide an extension using *--extension* option.
+If you have **ani.rb** or **fastANI** installed in Your environment you may use --anirb or --fastani to calculate ANI for list of genomes using *--input_list* or folder containing genomes *--input_dir*. Genomes should have FASTA format, You may provide an extension using *--extension* option.
 
