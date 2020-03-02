@@ -179,6 +179,8 @@ parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default)
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
 parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
+parser.add_argument("--reroot", help="Reroot tree at midpoint", action="store_true")
+
 
 args = parser.parse_args()
 
@@ -245,12 +247,14 @@ if (args.mode == "UPGMA" or args.mode == "both"):
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
 		print(upgma_tree.as_ascii_plot(plot_metric='length'), file = open("%s.upgma.unrooted.txt" % args.prefix, 'w'))
-	upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
-	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
+	if args.reroot:
+		upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
+		print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
 if (args.mode == "NJ" or args.mode == "both"):
 	nj_tree = pdm.nj_tree()
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
 		print(nj_tree.as_ascii_plot(plot_metric='length'), file = open("%s.nj.unrooted.txt" % args.prefix, 'w'))
-	nj_tree.reroot_at_midpoint(suppress_unifurcations = False)
-	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.rooted.nwk" % args.prefix, 'w'))
+	if args.reroot:
+		nj_tree.reroot_at_midpoint(suppress_unifurcations = False)
+		print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.rooted.nwk" % args.prefix, 'w'))
