@@ -26,18 +26,20 @@ def tableToDistDict(filename):
 	infile = open(filename, 'r')
 	dists = {}
 	ids = []
-	line = infile.readline()
-
-	while line:
-		line.rstrip("\n\r\t ")
-		(query, ref, ani) = line.split("\t")[0:3]
+	
+	for line in infile.readlines():
+		(query, ref, ani) = line.rstrip('\n\r\t ').split("\t")[0:3]
 		query = query.split("/")[-1]
 		ref = ref.split("/")[-1]
 		if query not in ids:
 			dists[query] = {}
 			ids.append(query)
+		if ref not in ids:
+			dists[ref] = {}
+			ids.append(ref)
+
 		dists[query][ref] = aniToDistance(ani)
-		line = infile.readline()
+		dists[ref][query] = aniToDistance(ani)
 
 	infile.close()
 	return dists
@@ -114,14 +116,17 @@ def heatmapFromDist(dist_dict):
 	l = linkage(dist_arr)
 	fig, ax = plt.subplots()
 	ax.set_yticks( arange( len(dist_dict) ) )
+	ax.set_xticks( arange( len(dist_dict) ) )
 
 	order = leaves_list(l)
 	dist_arr = dist_arr[order, ]
 	dist_arr = dist_arr[:, order]
 	names = names[order]
 
-	ax.set_yticklabels(names,fontdict={'fontsize':'xx-small'})
+	ax.set_yticklabels(names, fontdict={'fontsize':'xx-small'})
+	ax.set_xticklabels(names, fontdict={'fontsize':'xx-small'})
 	plt.setp(ax.get_yticklabels(), rotation=0, ha="right", rotation_mode="anchor")
+	plt.setp(ax.get_xticklabels(), rotation=30, ha="right", rotation_mode="anchor")
 
 	im = ax.imshow(dist_arr, cmap=COLOR_MAP)
 	ax.set_title("ANI distance between genomes")
@@ -152,6 +157,22 @@ def checkExec(bin):
 	except Exception as e:
 		raise e
 
+#dnadiff .report parsing
+def ani_from_report(filename):
+	for line in open(filename).readlines():
+		l = line.rstrip().split()
+		if len(l) > 0 and l[0] == "AvgIdentity":
+			return (l[1])
+
+#dnadiff run
+def get_dnadiff_report(path1, path2, prefix="tmp"):
+	cmd = ["dnadiff", "-p", prefix, path1, path2]
+	r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	if r.returncode == 0:
+		return f"{prefix}.report"
+	else:
+		raise Exception("An error acquired during dnadiff execution!")
+
 
 def listToFile(l):
 	name = "%s.lst" % args.prefix
@@ -167,6 +188,7 @@ group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
 group.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
 group.add_argument("--anirb", help="Calculate ANI with ani.rb (slow). --input_list/--input_dir required", action="store_true")
+group.add_argument("--mummer",help="Calculate ANI with mummer. --input_list/--input_dir required", action="store_true")
 group.add_argument("--fastani", help="Calculate ANI with fastANI (fast). --input_list/--input_dir required", action="store_true")
 
 ingroup = parser.add_mutually_exclusive_group()
@@ -185,8 +207,8 @@ parser.add_argument("--reroot", help="Reroot tree at midpoint", action="store_tr
 args = parser.parse_args()
 
 
-if (args.anirb or args.fastani):
-	binary = "ani.rb" if args.anirb else "fastANI"
+if (args.anirb or args.fastani or args.mummer):
+	binary = "ani.rb" if args.anirb else "fastANI" if args.fastani else "dnadiff"
 	if checkExec(binary) == False:
 		print("Failed to run \'%s\'" % binary)
 		exit(1)
@@ -215,19 +237,36 @@ if (args.anirb or args.fastani):
 				r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
 				if len(r) > 0:
 					results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
-		file_resulsts = "%s.tsv" % args.prefix
-		print("\n".join(results), file = open(file_resulsts, "w"))
+		for i in range(0, len(file_list)):
+			results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[i]), str(100)]))
+		file_results = "%s.tsv" % args.prefix
+		print("\n".join(results), file = open(file_results, "w"))
+
+	if args.mummer:
+		results = []
+		print("Running dnadiff from mummer", file = sys.stderr)
+		for i in range(0, len(file_list)):
+			for j in range(i+1, len(file_list)):
+				report = get_dnadiff_report(file_list[i],file_list[j])
+				r = ani_from_report(report)
+				if len(r) > 0:
+					results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
+		for i in range(0, len(file_list)):
+			results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[i]), str(100)]))
+		file_results = "%s.tsv" % args.prefix
+		print("\n".join(results), file = open(file_results, "w"))
 
 	if args.fastani:
 		print("Running fastANI", file = sys.stderr)
 		file_list_name = listToFile(file_list)
-		file_resulsts = "%s.tsv" % args.prefix
-		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_resulsts]
+		file_results = "%s.tsv" % args.prefix
+		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results]
 		rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
 		if rc != 0:
 			print("fastANI didn't work correctly.")
 			exit(1)
-	dist_dict = tableToDistDict(file_resulsts)
+
+	dist_dict = tableToDistDict(file_results)
 
 # Parse input files
 if args.low_triangular_matrix:
