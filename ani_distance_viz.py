@@ -159,10 +159,11 @@ def checkExec(bin):
 
 #dnadiff .report parsing
 def ani_from_report(filename):
-	for line in open(filename).readlines():
-		l = line.rstrip().split()
-		if len(l) > 0 and l[0] == "AvgIdentity":
-			return (l[1])
+	with open(filename) as f:
+		for line in f:
+			l = line.rstrip().split()
+			if len(l) > 0 and l[0] == "AvgIdentity":
+				return (l[1])
 
 #dnadiff run
 def get_dnadiff_report(path1, path2, prefix="tmp"):
@@ -176,9 +177,8 @@ def get_dnadiff_report(path1, path2, prefix="tmp"):
 
 def listToFile(l):
 	name = "%s.lst" % args.prefix
-	f = open(name,'w')
-	print("\n".join(l), file=f)
-	f.close()
+	with open(name,'w') as f:
+		f.writelines(l)
 	return name
 
 
@@ -194,14 +194,15 @@ group.add_argument("--fastani", help="Calculate ANI with fastANI (fast). --input
 ingroup = parser.add_mutually_exclusive_group()
 ingroup.add_argument("--input_list", help="List of genomes with full path for ANI calculation")
 ingroup.add_argument("--input_dir", help="Path to directory containig genomes for ANI calculation")
+parser.add_argument("-x", "--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 
-parser.add_argument("--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
-parser.add_argument("-m", "--mode", help="Tree inference method: UPGMA (default), NJ, both or none", default="UPGMA")
+parser.add_argument("-m", "--tree_method", help="Phylogenetic tree inference method (default UPGMA)", default="UPGMA", choises=["UPGMA", "NJ", "both", "none"])
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
 parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
 parser.add_argument("--reroot", help="Reroot tree at midpoint", action="store_true")
+#parser.add_argument("--threads", help="Number of CPU threads (where aplicable)", default=1)
 
 
 args = parser.parse_args()
@@ -215,7 +216,6 @@ if (args.anirb or args.fastani or args.mummer):
 	file_list =[]
 	if args.input_list:
 		f = open(args.input_list)
-		start = time.process_time()
 		for l in f.readlines():
 			l = l.strip()
 			if (os.path.exists(l) and l.split(".")[-1] == args.extension):
@@ -281,7 +281,7 @@ if args.heatmap:
 # Calculate Dendropy compatible phylogenetic distance matrix
 pdm = pdmFromDistDict(dist_dict)
 
-if (args.mode == "UPGMA" or args.mode == "both"):
+if (args.tree_method == "UPGMA" or args.tree_method == "both"):
 	upgma_tree = pdm.upgma_tree()
 	print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:
@@ -289,7 +289,7 @@ if (args.mode == "UPGMA" or args.mode == "both"):
 	if args.reroot:
 		upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
 		print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
-if (args.mode == "NJ" or args.mode == "both"):
+if (args.tree_method == "NJ" or args.tree_method == "both"):
 	nj_tree = pdm.nj_tree()
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.unrooted.nwk" % args.prefix, 'w'))
 	if args.ascii_tree:

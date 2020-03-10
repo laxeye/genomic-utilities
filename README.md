@@ -1,15 +1,16 @@
-# `ani_distance_viz.py`
+## `ani_distance_viz.py`
 
 Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide identity)-derived genomic distances.
 
 
 ## Usage
 
-`ani_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --fastani) [--input_list INPUT_LIST | --input_dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [-H] [-A] [-d] [--reroot]`
+`ani_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --mummer | --fastani) [--input_list INPUT_LIST | --input_dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [-H] [-A] [-d] [--reroot]`
 
 
 ### Command-line options
 
+```
 -h, --help                              Show this help message and exit
 
 -l FILE, --low_triangular_matrix FILE   Low triangular matrix of ANI values
@@ -19,6 +20,8 @@ Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide ide
 --anirb									Calculate ANI with ani.rb (should be installed separately) (slow). --input_list/--input_dir required
 
 --fastani								Calculate ANI with fastANI (should be installed separately) (fast). --input_list/--input_dir required
+
+--mummer								Calculate ANI with mummer. --input_list/--input_dir required
 
 --input_list FILE						List of full paths of genomes for ANI calculation
 
@@ -37,6 +40,7 @@ Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide ide
 -d, --plot_dendrogram                   Plot a dendrogram
 
 --reroot								Reroot tree at midpoint
+```
 
 
 ### Input files
@@ -55,7 +59,7 @@ May be produced by e.g. [ani.rb](https://github.com/lmrodriguezr/enveomics):
 Or by [fastANI](https://github.com/ParBLiSS/FastANI).
 
 
-If you have **ani.rb** or **fastANI** installed in Your environment you may use --anirb or --fastani to calculate ANI for list of genomes using *--input_list* or folder containing genomes *--input_dir*. Genomes should have FASTA format, You may provide an extension using *--extension* option.
+If you have **ani.rb**, **mummer4** or **fastANI** installed in Your environment you may use --anirb or --fastani to calculate ANI for list of genomes using *--input_list* or folder containing genomes *--input_dir*. Genomes should have FASTA format, You may provide an extension using *--extension* option.
 
 
 ## Requirements
@@ -76,7 +80,7 @@ or conda
 Optional:
 [fastANI](https://github.com/ParBLiSS/FastANI)
 [ani.rb](https://github.com/lmrodriguezr/enveomics)
-
+[Mummer4](https://github.com/mummer4/mummer)
 
 ## Known bugs
 
