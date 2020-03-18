@@ -12,36 +12,40 @@ from numpy import array, arange
 from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
 
 
-#Set distance for unknown (low) ANI
-NA_DISTANCE = 0.3
+#Set distance for unknown (low) ANI and AAI
+ANI_NA_DISTANCE = 0.3
+AAI_NA_DISTANCE = 0.8
 #PNG resolution
 PNG_DPI = 300
 
 
 def aniToDistance(ani):
-	return NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
+	return ANI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
+
+def aaiToDistance(ani):
+	return AAI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
 
 
 def tableToDistDict(filename):
-	infile = open(filename, 'r')
 	dists = {}
 	ids = []
 	
-	for line in infile.readlines():
-		(query, ref, ani) = line.rstrip('\n\r\t ').split("\t")[0:3]
-		query = query.split("/")[-1]
-		ref = ref.split("/")[-1]
-		if query not in ids:
-			dists[query] = {}
-			ids.append(query)
-		if ref not in ids:
-			dists[ref] = {}
-			ids.append(ref)
+	with open(filename, 'r') as infile:
+		for line in infile:
+			(query, ref, value) = line.rstrip('\n\r\t ').split("\t")[0:3]
+			query = query.split("/")[-1]
+			ref = ref.split("/")[-1]
+			if query not in ids:
+				dists[query] = {}
+				ids.append(query)
+			if ref not in ids:
+				dists[ref] = {}
+				ids.append(ref)
 
-		dists[query][ref] = aniToDistance(ani)
-		dists[ref][query] = aniToDistance(ani)
+			value = aaiToDistance(value) if args.aairb else aniToDistance(value)
+			dists[query][ref] = value
+			dists[ref][query] = value
 
-	infile.close()
 	return dists
 
 
@@ -58,6 +62,7 @@ def ltmToDistDict(filename):
 		ids.append(name)
 		dists[name] = {}
 		for i in range(len(l)):
+			#Supposing ANI
 			dists[name][ids[i]] = aniToDistance(l[i])
 
 	return dists
@@ -101,7 +106,7 @@ def printDistAsCSV(d):
 
 def plotDendrogram(l, names):
 	plt.figure(figsize=(10, 6), dpi=PNG_DPI)
-	plt.title("ANI-derived dendrogram")
+	plt.title("Distance-derived dendrogram")
 	dendrogram(l, orientation='top', labels=names, distance_sort='descending', show_leaf_counts=True)
 	plt.savefig("%s.dendrogram.png" % args.prefix, dpi=PNG_DPI)
 	plt.savefig("%s.dendrogram.svg" % args.prefix)
@@ -129,7 +134,7 @@ def heatmapFromDist(dist_dict):
 	plt.setp(ax.get_xticklabels(), rotation=30, ha="right", rotation_mode="anchor")
 
 	im = ax.imshow(dist_arr, cmap=COLOR_MAP)
-	ax.set_title("ANI distance between genomes")
+	ax.set_title("Distance between genomes")
 	plt.colorbar(im)
 	plt.savefig("%s.heatmap.png" % args.prefix, dpi=PNG_DPI)
 	plt.savefig("%s.heatmap.svg" % args.prefix)
@@ -182,34 +187,35 @@ def listToFile(l):
 	return name
 
 
-parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from ANI-derived genomic distances.")
+parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from genomic distances (based on ANI or AAI).")
 
 group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of ANI values")
-group.add_argument("-t", "--ani_table", help="Tab separated table of ANI values")
+group.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of distance values (ANI or AAI)")
+group.add_argument("-t", "--table", help="Tab separated table of distance values")
 group.add_argument("--anirb", help="Calculate ANI with ani.rb (slow). --input_list/--input_dir required", action="store_true")
 group.add_argument("--mummer",help="Calculate ANI with mummer. --input_list/--input_dir required", action="store_true")
 group.add_argument("--fastani", help="Calculate ANI with fastANI (fast). --input_list/--input_dir required", action="store_true")
+group.add_argument("--aairb", help="Calculate AAI with aai.rb (slow). --input_list/--input_dir required", action="store_true")
 
 ingroup = parser.add_mutually_exclusive_group()
-ingroup.add_argument("--input_list", help="List of genomes with full path for ANI calculation")
-ingroup.add_argument("--input_dir", help="Path to directory containig genomes for ANI calculation")
+ingroup.add_argument("--input_list", help="List of genomes with full path for distance calculation")
+ingroup.add_argument("--input_dir", help="Path to directory containig genomes for distance calculation")
 parser.add_argument("-x", "--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 
 parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
-parser.add_argument("-m", "--tree_method", help="Phylogenetic tree inference method (default UPGMA)", default="UPGMA", choises=["UPGMA", "NJ", "both", "none"])
+parser.add_argument("-m", "--tree_method", help="Phylogenetic tree inference method (default UPGMA)", default="UPGMA", choices=["UPGMA", "NJ", "both", "none"])
 parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
 parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
-parser.add_argument("--reroot", help="Reroot tree at midpoint", action="store_true")
-#parser.add_argument("--threads", help="Number of CPU threads (where aplicable)", default=1)
+parser.add_argument("--reroot", help="Reroot tree at midpoint. May cause errors or incorrect trees", action="store_true")
+parser.add_argument("--threads", help="Number of CPU threads (where possible)", type=int, default=1)
 
 
 args = parser.parse_args()
 
 
-if (args.anirb or args.fastani or args.mummer):
-	binary = "ani.rb" if args.anirb else "fastANI" if args.fastani else "dnadiff"
+if (args.anirb or args.fastani or args.mummer or args.aairb):
+	binary = "ani.rb" if args.anirb else "fastANI" if args.fastani else "dnadiff" if args.mummer else "aai.rb"
 	if checkExec(binary) == False:
 		print("Failed to run \'%s\'" % binary)
 		exit(1)
@@ -233,7 +239,21 @@ if (args.anirb or args.fastani or args.mummer):
 		print("Running ani.rb", file = sys.stderr)
 		for i in range(0, len(file_list)):
 			for j in range(i+1, len(file_list)):
-				cmd = ["ani.rb", "-1", file_list[i], "-2", file_list[j], "-a", "-q"]
+				cmd = ["ani.rb", "-1", file_list[i], "-2", file_list[j], "-a", "-q", "-t", str(args.threads)]
+				r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
+				if len(r) > 0:
+					results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
+		for i in range(0, len(file_list)):
+			results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[i]), str(100)]))
+		file_results = "%s.tsv" % args.prefix
+		print("\n".join(results), file = open(file_results, "w"))
+	
+	if args.aairb:
+		results = []
+		print("Running aai.rb", file = sys.stderr)
+		for i in range(0, len(file_list)):
+			for j in range(i+1, len(file_list)):
+				cmd = ["aai.rb", "-1", file_list[i], "-2", file_list[j], "-a", "-q", "-t", str(args.threads)]
 				r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
 				if len(r) > 0:
 					results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
@@ -260,7 +280,7 @@ if (args.anirb or args.fastani or args.mummer):
 		print("Running fastANI", file = sys.stderr)
 		file_list_name = listToFile(file_list)
 		file_results = "%s.tsv" % args.prefix
-		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results]
+		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results, "-t", str(args.threads)]
 		rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
 		if rc != 0:
 			print("fastANI didn't work correctly.")
@@ -271,8 +291,8 @@ if (args.anirb or args.fastani or args.mummer):
 # Parse input files
 if args.low_triangular_matrix:
 	dist_dict = ltmToDistDict(args.low_triangular_matrix)
-if args.ani_table:
-	dist_dict = tableToDistDict(args.ani_table)
+if args.table:
+	dist_dict = tableToDistDict(args.table)
 
 # Draw a heatmap with pyplot
 if args.heatmap:
@@ -289,6 +309,9 @@ if (args.tree_method == "UPGMA" or args.tree_method == "both"):
 	if args.reroot:
 		upgma_tree.reroot_at_midpoint(suppress_unifurcations = False)
 		print(upgma_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.upgma.rooted.nwk" % args.prefix, 'w'))
+		if args.ascii_tree:
+			print(upgma_tree.as_ascii_plot(plot_metric='length'), file = open("%s.upgma.rooted.txt" % args.prefix, 'w'))
+	
 if (args.tree_method == "NJ" or args.tree_method == "both"):
 	nj_tree = pdm.nj_tree()
 	print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.unrooted.nwk" % args.prefix, 'w'))
@@ -297,3 +320,5 @@ if (args.tree_method == "NJ" or args.tree_method == "both"):
 	if args.reroot:
 		nj_tree.reroot_at_midpoint(suppress_unifurcations = False)
 		print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.rooted.nwk" % args.prefix, 'w'))
+		if args.ascii_tree:
+			print(nj_tree.as_ascii_plot(plot_metric='length'), file = open("%s.nj.rooted.txt" % args.prefix, 'w'))

@@ -1,21 +1,21 @@
-## `ani_distance_viz.py`
+## `genomic_distance_viz.py`
 
-Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide identity)-derived genomic distances.
+Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide identity) or AAI (average aminoacid identity)-derived genomic distances.
 
 
 ## Usage
 
-`ani_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --mummer | --fastani) [--input_list INPUT_LIST | --input_dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [-H] [-A] [-d] [--reroot]`
+`genomic_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --aairb | --mummer | --fastani) [--input_list INPUT_LIST | --input_dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [--threads THREADS] [-H] [-A] [-d] [--reroot]`
 
 
 ### Command-line options
 
 ```
--h, --help                              Show this help message and exit
+-h, --help								Show this help message and exit
 
 -l FILE, --low_triangular_matrix FILE   Low triangular matrix of ANI values
 
--t FILE, --ani_table FILE               Tab separated table of ANI values
+-t FILE, --table FILE					Tab separated table of similarity (ANI or AAI) between genomes
 
 --anirb									Calculate ANI with ani.rb (should be installed separately) (slow). --input_list/--input_dir required
 
@@ -29,27 +29,29 @@ Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide ide
 
 --extension STRING						Fasta files extension for use with --input_dir, e.g. fna (default), fa, fasta
 
--p STRING, --prefix STRING              Prefix for output files
+-p STRING, --prefix STRING				Prefix for output files
 
--m MODE, --mode MODE                    Tree inference method: UPGMA (default), NJ, both or none
+-m MODE, --mode MODE					Tree inference method: UPGMA (default), NJ, both or none
 
--H, --heatmap                           Draw a heatmap
+--threads THREADS						Number of CPU threads (where possible)
 
--A, --ascii_tree                        Draw ASCII tree to stdout
+-H, --heatmap							Draw a heatmap
 
--d, --plot_dendrogram                   Plot a dendrogram
+-A, --ascii_tree						Draw ASCII tree to stdout
 
---reroot								Reroot tree at midpoint
+-d, --plot_dendrogram					Plot a dendrogram
+
+--reroot								Reroot tree at midpoint. May cause errors or incorrect trees
 ```
 
 
 ### Input files
 
-**Low triangular matrix** - matrix produced by [fastANI](https://github.com/ParBLiSS/FastANI) with "--matrix" option.
+**Low triangular matrix** - matrix produced by [fastANI](https://github.com/ParBLiSS/FastANI) with "--matrix" option or any other software.
 
 **ANI table** - tab-separated file of such structure: 
 
-`Genome1    Genome2    ANI[   ...]`
+`Genome1    Genome2    Identity[   ...]`
 
 May be produced by e.g. [ani.rb](https://github.com/lmrodriguezr/enveomics):
 
@@ -59,7 +61,7 @@ May be produced by e.g. [ani.rb](https://github.com/lmrodriguezr/enveomics):
 Or by [fastANI](https://github.com/ParBLiSS/FastANI).
 
 
-If you have **ani.rb**, **mummer4** or **fastANI** installed in Your environment you may use --anirb or --fastani to calculate ANI for list of genomes using *--input_list* or folder containing genomes *--input_dir*. Genomes should have FASTA format, You may provide an extension using *--extension* option.
+If you have **ani.rb**, **aai.rb**, **mummer4** or **fastANI** installed in Your environment you may use corresponding key to calculate genome identity for list of genomes using *--input_list* or folder containing genomes *--input_dir*. Genomes should have FASTA format, You may provide an extension using *--extension* option.
 
 
 ## Requirements
@@ -80,6 +82,7 @@ or conda
 Optional:
 [fastANI](https://github.com/ParBLiSS/FastANI)
 [ani.rb](https://github.com/lmrodriguezr/enveomics)
+[aai.rb](https://github.com/lmrodriguezr/enveomics)
 [Mummer4](https://github.com/mummer4/mummer)
 
 ## Known bugs
