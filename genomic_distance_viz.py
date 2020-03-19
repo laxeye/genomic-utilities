@@ -112,7 +112,7 @@ def plotDendrogram(l, names, prefix):
 	plt.savefig("%s.dendrogram.svg" % prefix)
 
 
-def heatmapFromDist(dist_dict, prefix):
+def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
 	#Set colors for heatmap
 	COLOR_MAP = cm.RdGy
 
@@ -139,7 +139,7 @@ def heatmapFromDist(dist_dict, prefix):
 	plt.savefig("%s.heatmap.png" % prefix, dpi=PNG_DPI)
 	plt.savefig("%s.heatmap.svg" % prefix)
 
-	if args.plot_dendrogram:
+	if plot_dendrogram:
 		plotDendrogram(l, names, prefix)
 
 
@@ -234,48 +234,25 @@ def main():
 			print("Genomes are not provided. Exiting.")
 			exit(1)
 		
-		if args.anirb:
+		if args.anirb or args.aairb or args.mummer:
 			results = []
-			print("Running ani.rb", file = sys.stderr)
-			for i in range(0, len(file_list)):
-				for j in range(i+1, len(file_list)):
-					cmd = ["ani.rb", "-1", file_list[i], "-2", file_list[j], "-a", "-q", "-t", str(args.threads)]
+			print(f"Running {binary}", file = sys.stderr)
+			#Generate list of pairs (Genome1, Genome2) for A*I calculating
+			pairs = [(file_list[i], file_list[j]) for i in range(len(file_list)) for j in range(i,len(file_list)) if i != j]
+			for (i, j) in pairs:
+				if args.mummer:
+					report = get_dnadiff_report(i,j)
+					r = ani_from_report(report)
+				else:
+					cmd = [binary, "-1", i, "-2", j, "-a", "-q", "-t", str(args.threads)]
 					r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
-					if len(r) > 0:
-						results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
-			for i in range(0, len(file_list)):
-				results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[i]), str(100)]))
+				if len(r) > 0:
+					results.append("\t".join([os.path.basename(i), os.path.basename(j), r]))
+			for file in file_list:
+				results.append("\t".join([os.path.basename(file), os.path.basename(file), str(100)]))
 			file_results = "%s.tsv" % args.prefix
 			print("\n".join(results), file = open(file_results, "w"))
 		
-		if args.aairb:
-			results = []
-			print("Running aai.rb", file = sys.stderr)
-			for i in range(0, len(file_list)):
-				for j in range(i+1, len(file_list)):
-					cmd = ["aai.rb", "-1", file_list[i], "-2", file_list[j], "-a", "-q", "-t", str(args.threads)]
-					r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
-					if len(r) > 0:
-						results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
-			for i in range(0, len(file_list)):
-				results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[i]), str(100)]))
-			file_results = "%s.tsv" % args.prefix
-			print("\n".join(results), file = open(file_results, "w"))
-
-		if args.mummer:
-			results = []
-			print("Running dnadiff from mummer", file = sys.stderr)
-			for i in range(0, len(file_list)):
-				for j in range(i+1, len(file_list)):
-					report = get_dnadiff_report(file_list[i],file_list[j])
-					r = ani_from_report(report)
-					if len(r) > 0:
-						results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[j]), r]))
-			for i in range(0, len(file_list)):
-				results.append("\t".join([os.path.basename(file_list[i]), os.path.basename(file_list[i]), str(100)]))
-			file_results = "%s.tsv" % args.prefix
-			print("\n".join(results), file = open(file_results, "w"))
-
 		if args.fastani:
 			print("Running fastANI", file = sys.stderr)
 			file_list_name = listToFile(file_list)
@@ -296,7 +273,7 @@ def main():
 
 	# Draw a heatmap with pyplot
 	if args.heatmap:
-		heatmapFromDist(dist_dict, args.prefix)
+		heatmapFromDist(dist_dict, args.prefix, args.plot_dendrogram)
 
 	# Calculate Dendropy compatible phylogenetic distance matrix
 	pdm = pdmFromDistDict(dist_dict, args.prefix)
