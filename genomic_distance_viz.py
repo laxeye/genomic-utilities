@@ -180,10 +180,10 @@ def get_dnadiff_report(path1, path2, prefix="tmp"):
 		raise Exception("An error acquired during dnadiff execution!")
 
 
-def listToFile(l):
-	name = "%s.lst" % args.prefix
+def listToFile(l, prefix):
+	name = "%s.lst" % prefix
 	with open(name,'w') as f:
-		f.writelines(l)
+		f.write("\n".join(l))
 	return name
 
 def main():
@@ -255,7 +255,7 @@ def main():
 		
 		if args.fastani:
 			print("Running fastANI", file = sys.stderr)
-			file_list_name = listToFile(file_list)
+			file_list_name = listToFile(file_list, args.prefix)
 			file_results = "%s.tsv" % args.prefix
 			cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results, "-t", str(args.threads)]
 			rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
