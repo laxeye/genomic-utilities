@@ -119,6 +119,10 @@ def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
 	dist_arr = array( distDictToList(dist_dict) )
 	names = array( list(dist_dict) )
 	l = linkage(dist_arr)
+
+	if plot_dendrogram:
+		plotDendrogram(l, names, prefix)
+
 	fig, ax = plt.subplots()
 	ax.set_yticks( arange( len(dist_dict) ) )
 	ax.set_xticks( arange( len(dist_dict) ) )
@@ -139,8 +143,6 @@ def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
 	plt.savefig("%s.heatmap.png" % prefix, dpi=PNG_DPI)
 	plt.savefig("%s.heatmap.svg" % prefix)
 
-	if plot_dendrogram:
-		plotDendrogram(l, names, prefix)
 
 
 def pdmFromDistDict(dist_dict, prefix):
