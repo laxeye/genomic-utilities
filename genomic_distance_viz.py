@@ -247,7 +247,9 @@ def main():
 					r = ani_from_report(report)
 				else:
 					cmd = [binary, "-1", i, "-2", j, "-a", "-q", "-t", str(args.threads)]
-					r = subprocess.run(cmd, stdout = subprocess.PIPE, text = True).stdout.strip()
+					if args.aairb:
+						cmd = cmd + ['-p', 'diamond']
+					r = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.DEVNULL, text = True).stdout.strip()
 				if len(r) > 0:
 					results.append("\t".join([os.path.basename(i), os.path.basename(j), r]))
 			for file in file_list:
