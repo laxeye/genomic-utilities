@@ -22,6 +22,7 @@ PNG_DPI = 300
 def aniToDistance(ani):
 	return ANI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
 
+
 def aaiToDistance(ani):
 	return AAI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
 
@@ -144,7 +145,6 @@ def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
 	plt.savefig("%s.heatmap.svg" % prefix)
 
 
-
 def pdmFromDistDict(dist_dict, prefix):
 	#Returns phylogenetic distance matrix object from Dendropy
 	outputtmp = printDistAsCSV(dist_dict)
@@ -188,8 +188,8 @@ def listToFile(l, prefix):
 		f.write("\n".join(l))
 	return name
 
-def main():
 
+def parse_args():
 	parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from genomic distances (based on ANI or AAI).")
 
 	group = parser.add_mutually_exclusive_group(required=True)
@@ -213,11 +213,27 @@ def main():
 	parser.add_argument("--reroot", help="Reroot tree at midpoint. May cause errors or incorrect trees", action="store_true")
 	parser.add_argument("--threads", help="Number of CPU threads (where possible)", type=int, default=1)
 
-	args = parser.parse_args()
+	return parser.parse_args()
 
+
+def what_to_run(args):
+	if args.anirb:
+		return "ani.rb"
+	elif args.aairb:
+		return "aai.rb"
+	elif args.fastani:
+		return "fastANI"
+	elif args.mummer:
+		return "dnadiff"
+	else:
+		raise Exception("Unknown executable provided!")
+		return None
+
+def main():
+	args = parse_args()
 
 	if (args.anirb or args.fastani or args.mummer or args.aairb):
-		binary = "ani.rb" if args.anirb else "fastANI" if args.fastani else "dnadiff" if args.mummer else "aai.rb"
+		binary = what_to_run(args)
 		if checkExec(binary) == False:
 			print("Failed to run \'%s\'" % binary)
 			exit(1)
@@ -236,6 +252,11 @@ def main():
 			print("Genomes are not provided. Exiting.")
 			exit(1)
 		
+		if len(file_list) < 2:
+			print(f"Genome count too low: {len(file_list)}.\n" + 
+				"Please check file extensions and path to files.")
+			exit(1)
+
 		if args.anirb or args.aairb or args.mummer:
 			results = []
 			print(f"Running {binary}", file = sys.stderr)
