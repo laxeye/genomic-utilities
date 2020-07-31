@@ -119,7 +119,7 @@ def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
 
 	dist_arr = array( distDictToList(dist_dict) )
 	names = array( list(dist_dict) )
-	l = linkage(dist_arr)
+	l = linkage(dist_arr, method="centroid", optimal_ordering=True)
 
 	if plot_dendrogram:
 		plotDendrogram(l, names, prefix)
