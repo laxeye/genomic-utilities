@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import time
 import dendropy
 import sys
 import io
@@ -9,7 +8,8 @@ import argparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from numpy import array, arange
-from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list
+from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list, fcluster, leaders
+import logging
 
 
 #Set distance for unknown (low) ANI and AAI
@@ -28,6 +28,7 @@ def aaiToDistance(ani):
 
 
 def tableToDistDict(filename, is_aairb):
+	"""Returns genome distances in form of dict"""
 	dists = {}
 	ids = []
 	
@@ -50,27 +51,32 @@ def tableToDistDict(filename, is_aairb):
 	return dists
 
 
-def ltmToDistDict(filename):
-	lines = open(filename, 'r').read().split("\n")
+def ltmToDistDict(filename, is_aairb):
+	"""Returns genome distances in form of dict"""
+	try:
+		lines = open(filename, 'r').readlines()
+	except Exception as e:
+		logger.error("Error: Impossible to read %s", filename)
+		raise e
 	lines.pop(0) # First line contains only number of taxa (rows)
 	ids = []
 	dists = {}
 
 	for line in lines:
-		if len(line) == 0: break
+		if len(line) == 0:
+			break
 		l = line.rstrip("\r\n\t ").split('\t')
 		name = l.pop(0).split("/")[-1]
 		ids.append(name)
 		dists[name] = {}
-		for i in range(len(l)):
-			#Supposing ANI
-			dists[name][ids[i]] = aniToDistance(l[i])
+		for i, v in enumerate(l):
+			dists[name][ids[i]] = aaiToDistance(v) if is_aairb else aniToDistance(v)
 
 	return dists
 
 
 def distDictToList(d):
-	#Creates two-dimensional list from dict
+	"""Create two-dimensional list from dict"""
 	keys = list(d)
 	ani_list = []
 
@@ -79,7 +85,8 @@ def distDictToList(d):
 		for y in range(len(keys)):
 			value = 0
 			if x != y:
-				(i, j) = (y, x) if x < y else (x, y) # Compatibility with LT-matrices
+				(i, j) = (y, x) if x < y else (x, y)
+				"""For compatibility with LT-matrices"""
 				if ( keys[i] in d and keys[j] in d[keys[i]] ):
 					value = d[keys[i]][keys[j]] 
 				else:
@@ -91,48 +98,66 @@ def distDictToList(d):
 
 
 def printDistAsCSV(dists):
+	"""Create in-memory file object"""
 	inmem = io.StringIO()
 	keys = list(dists)
 	# 1st field [0,0] must be empty for Dendropy compatibility
-	print("," + ",".join(keys), file = inmem)
+	print("," + ",".join(keys), file=inmem)
 	ani_list = distDictToList(dists)
 
-	for x in range(len(keys)):
-		t = list(map(lambda x: str(x), ani_list[x]))
-		t.insert(0, keys[x])
-		print(",".join(t), file = inmem)
+	for i, key in enumerate(keys):
+		t = list(map(str, ani_list[i]))
+		t.insert(0, key)
+		print(",".join(t), file=inmem)
 
 	return inmem
 
 
-def plotDendrogram(l, names, prefix):
+def plotDendrogram(lm, names, prefix):
+	logger.info("Plotting dendrogram")
 	plt.figure(figsize=(10, 6), dpi=PNG_DPI)
 	plt.title("Distance-derived dendrogram")
-	dendrogram(l, orientation='top', labels=names, distance_sort='descending', show_leaf_counts=True)
+	dendrogram(lm, orientation='top', labels=names, distance_sort='descending', show_leaf_counts=True)
 	plt.savefig("%s.dendrogram.png" % prefix, dpi=PNG_DPI)
 	plt.savefig("%s.dendrogram.svg" % prefix)
 
 
-def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
+def clusterGenomes(dist_dict, args):
 	#Set colors for heatmap
 	COLOR_MAP = cm.RdGy
 
+	logger.info("Clustering genomes")
 	dist_arr = array( distDictToList(dist_dict) )
 	names = array( list(dist_dict) )
-	l = linkage(dist_arr, method="centroid", optimal_ordering=True)
+	lm = linkage(dist_arr, method="median", optimal_ordering=False)
 
-	if plot_dendrogram:
-		plotDendrogram(l, names, prefix)
+	if args.plot_dendrogram:
+		plotDendrogram(lm, names, args.prefix)
 
-	fig, ax = plt.subplots()
-	ax.set_yticks( arange( len(dist_dict) ) )
-	ax.set_xticks( arange( len(dist_dict) ) )
+	if args.print_clusters:
+		cluster_distance_t = 0.05
+		cluster_ids = fcluster(lm, t=cluster_distance_t, criterion="distance")
+		clustered_genomes = list(zip(names, cluster_ids))
+		nodes, cluster_leader_ids = leaders(lm, cluster_ids)
+		logger.debug("Leader node and cluster id:")
+		logger.debug(list(zip(nodes, cluster_leader_ids)))
+		with open("%s.repr.clstr" % args.prefix, 'w') as handle:
+			for x in sorted(cluster_leader_ids):
+				g, c = [y for y in clustered_genomes if y[1] == x][0]
+				handle.write("%s\t%s\n" % (g, c))
+		with open("%s.clstr" % args.prefix, 'w') as handle:
+			for genome, cluster_id in clustered_genomes:
+				handle.write("%s\t%s\n" % (genome, cluster_id))
 
-	order = leaves_list(l)
+	order = leaves_list(lm)
 	dist_arr = dist_arr[order, ]
 	dist_arr = dist_arr[:, order]
 	names = names[order]
 
+	"""Plot heatmap"""
+	fig, ax = plt.subplots()
+	ax.set_yticks( arange( len(dist_dict) ) )
+	ax.set_xticks( arange( len(dist_dict) ) )
 	ax.set_yticklabels(names, fontdict={'fontsize':'xx-small'})
 	ax.set_xticklabels(names, fontdict={'fontsize':'xx-small'})
 	plt.setp(ax.get_yticklabels(), rotation=0, ha="right", rotation_mode="anchor")
@@ -141,8 +166,8 @@ def heatmapFromDist(dist_dict, prefix, plot_dendrogram):
 	im = ax.imshow(dist_arr, cmap=COLOR_MAP)
 	ax.set_title("Distance between genomes")
 	plt.colorbar(im)
-	plt.savefig("%s.heatmap.png" % prefix, dpi=PNG_DPI)
-	plt.savefig("%s.heatmap.svg" % prefix)
+	plt.savefig("%s.heatmap.png" % args.prefix, dpi=PNG_DPI)
+	plt.savefig("%s.heatmap.svg" % args.prefix)
 
 
 def pdmFromDistDict(dist_dict, prefix):
@@ -158,26 +183,30 @@ def pdmFromDistDict(dist_dict, prefix):
 	return pdm
 
 
-def checkExec(bin):
+def checkExec(binary):
 	try:
-		return subprocess.run([bin,'-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode is not None
+		return subprocess.run([binary,'-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode is not None
 	except Exception as e:
 		raise e
 
-#dnadiff .report parsing
+
 def ani_from_report(filename):
+	"""Return ANI value from dnadiff report"""
 	with open(filename) as f:
 		for line in f:
 			l = line.rstrip().split()
 			if len(l) > 0 and l[0] == "AvgIdentity":
 				return (l[1])
+		else:
+			return "NA"
 
-#dnadiff run
+
 def get_dnadiff_report(path1, path2, prefix="tmp"):
+	"""Run dnadiff and retrun path to report"""
 	cmd = ["dnadiff", "-p", prefix, path1, path2]
 	r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	if r.returncode == 0:
-		return f"{prefix}.report"
+		return "%s.report" % prefix
 	else:
 		raise Exception("An error acquired during dnadiff execution!")
 
@@ -190,10 +219,10 @@ def listToFile(l, prefix):
 
 
 def parse_args():
-	parser = argparse.ArgumentParser(description = "Phylogenetic tree inference and heatmap drawing from genomic distances (based on ANI or AAI).")
+	parser = argparse.ArgumentParser(description="Phylogenetic tree inference and heatmap drawing from genomic distances (based on ANI or AAI).")
 
 	group = parser.add_mutually_exclusive_group(required=True)
-	group.add_argument("-l", "--low_triangular_matrix", help="Low triangular matrix of distance values (ANI or AAI)")
+	group.add_argument("-l", "--low-triangular-matrix", help="Low triangular matrix of distance values (ANI or AAI)")
 	group.add_argument("-t", "--table", help="Tab separated table of distance values")
 	group.add_argument("--anirb", help="Calculate ANI with ani.rb (slow). --input_list/--input_dir required", action="store_true")
 	group.add_argument("--mummer",help="Calculate ANI with mummer. --input_list/--input_dir required", action="store_true")
@@ -201,15 +230,17 @@ def parse_args():
 	group.add_argument("--aairb", help="Calculate AAI with aai.rb (slow). --input_list/--input_dir required", action="store_true")
 
 	ingroup = parser.add_mutually_exclusive_group()
-	ingroup.add_argument("--input_list", help="List of genomes with full path for distance calculation")
-	ingroup.add_argument("--input_dir", help="Path to directory containig genomes for distance calculation")
+	ingroup.add_argument("--input-list", help="List of genomes with full path for distance calculation")
+	ingroup.add_argument("--input-dir", help="Path to directory containig genomes for distance calculation")
 	parser.add_argument("-x", "--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 
 	parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
-	parser.add_argument("-m", "--tree_method", help="Phylogenetic tree inference method (default UPGMA)", default="UPGMA", choices=["UPGMA", "NJ", "both", "none"])
+	parser.add_argument("-m", "--tree-method", help="Phylogenetic tree inference method (default UPGMA)",
+		default="UPGMA", choices=["UPGMA", "NJ", "both", "none"])
 	parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
-	parser.add_argument("-A", "--ascii_tree", help="Draw ASCII tree to stdout", action="store_true")
-	parser.add_argument("-d", "--plot_dendrogram", help="Plot a dendrogram", action="store_true")
+	parser.add_argument("-A", "--ascii-tree", help="Draw ASCII tree to stdout", action="store_true")
+	parser.add_argument("-d", "--plot-dendrogram", help="Plot a dendrogram", action="store_true")
+	parser.add_argument("-c", "--print-clusters", help="Print genomic clusters", action="store_true")
 	parser.add_argument("--reroot", help="Reroot tree at midpoint. May cause errors or incorrect trees", action="store_true")
 	parser.add_argument("--threads", help="Number of CPU threads (where possible)", type=int, default=1)
 
@@ -226,79 +257,98 @@ def what_to_run(args):
 	elif args.mummer:
 		return "dnadiff"
 	else:
-		raise Exception("Unknown executable provided!")
-		return None
+		logger.critical("Unknown executable provided!")
+		raise RuntimeError("Unknown executable provided!")
+
+
+def calculateAI(args):
+	binary = what_to_run(args)
+	if not checkExec(binary):
+		logger.critical("Failed to run \'%s\'", binary)
+		sys.exit(1)
+
+	file_results = "%s.tsv" % args.prefix
+
+	file_list =[]
+	if args.input_list:
+		f = open(args.input_list)
+		for l in f.readlines():
+			l = l.strip()
+			if (os.path.exists(l) and l.split(".")[-1] == args.extension):
+				file_list.append(os.path.realpath(l))
+	elif args.input_dir:
+		for file in os.scandir(os.path.realpath(args.input_dir)):
+			if (file.is_file() and file.name.split(".")[-1] == args.extension):
+				file_list.append(file.path)
+	else:
+		logger.critical("Genomes are not provided. Exiting.")
+		sys.exit(1)
+	
+	if len(file_list) < 2:
+		logger.critical("Genome count too low: %s", len(file_list))
+		logger.critical("Please check file extensions and path to files.")
+		sys.exit(1)
+
+	if args.anirb or args.aairb or args.mummer:
+		results = []
+		logger.info("Running %s", binary)
+		#Generate list of pairs (Genome1, Genome2) for A*I calculating
+		pairs = [(file_list[i], file_list[j]) for i in range(len(file_list)) for j in range(i,len(file_list)) if i != j]
+		for (i, j) in pairs:
+			if args.mummer:
+				report = get_dnadiff_report(i,j)
+				r = ani_from_report(report)
+			else:
+				cmd = [binary, "-1", i, "-2", j, "-a", "-q", "-t", str(args.threads)]
+				if args.aairb:
+					cmd = cmd + ['-p', 'diamond']
+				r = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.DEVNULL, text = True).stdout.strip()
+			if len(r) > 0:
+				results.append("\t".join([os.path.basename(i), os.path.basename(j), r]))
+		for file in file_list:
+			results.append("\t".join([os.path.basename(file), os.path.basename(file), str(100)]))
+		with open(file_results, "w") as handle:
+			handle.write("\n".join(results))
+	
+	if args.fastani:
+		logger.info("Running fastANI")
+		file_list_name = listToFile(file_list, args.prefix)
+		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results, "-t", str(args.threads)]
+		rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
+		if rc != 0:
+			logger.critical("fastANI didn't work correctly.")
+			raise RuntimeError("fastANI error")
+
+	return tableToDistDict(file_results, args.aairb)
+
 
 def main():
 	args = parse_args()
+	global logger
+	logger = logging.getLogger("main")
+	logger.setLevel(logging.DEBUG)
+	formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+	ch = logging.StreamHandler()
+	ch.setLevel(logging.INFO)
+	ch.setFormatter(formatter)
+	logger.addHandler(ch)
+	fh = logging.FileHandler("%s.log" % args.prefix)
+	fh.setLevel(logging.DEBUG)
+	fh.setFormatter(formatter)
+	logger.addHandler(fh)
+	logger.info("Analysis started")
 
 	if (args.anirb or args.fastani or args.mummer or args.aairb):
-		binary = what_to_run(args)
-		if checkExec(binary) == False:
-			print("Failed to run \'%s\'" % binary)
-			exit(1)
-		file_list =[]
-		if args.input_list:
-			f = open(args.input_list)
-			for l in f.readlines():
-				l = l.strip()
-				if (os.path.exists(l) and l.split(".")[-1] == args.extension):
-					file_list.append(os.path.realpath(l))
-		elif args.input_dir:
-			for file in os.scandir(os.path.realpath(args.input_dir)):
-				if (file.is_file() and file.name.split(".")[-1] == args.extension):
-					file_list.append(file.path)
-		else:
-			print("Genomes are not provided. Exiting.")
-			exit(1)
-		
-		if len(file_list) < 2:
-			print(f"Genome count too low: {len(file_list)}.\n" + 
-				"Please check file extensions and path to files.")
-			exit(1)
-
-		if args.anirb or args.aairb or args.mummer:
-			results = []
-			print(f"Running {binary}", file = sys.stderr)
-			#Generate list of pairs (Genome1, Genome2) for A*I calculating
-			pairs = [(file_list[i], file_list[j]) for i in range(len(file_list)) for j in range(i,len(file_list)) if i != j]
-			for (i, j) in pairs:
-				if args.mummer:
-					report = get_dnadiff_report(i,j)
-					r = ani_from_report(report)
-				else:
-					cmd = [binary, "-1", i, "-2", j, "-a", "-q", "-t", str(args.threads)]
-					if args.aairb:
-						cmd = cmd + ['-p', 'diamond']
-					r = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.DEVNULL, text = True).stdout.strip()
-				if len(r) > 0:
-					results.append("\t".join([os.path.basename(i), os.path.basename(j), r]))
-			for file in file_list:
-				results.append("\t".join([os.path.basename(file), os.path.basename(file), str(100)]))
-			file_results = "%s.tsv" % args.prefix
-			print("\n".join(results), file = open(file_results, "w"))
-		
-		if args.fastani:
-			print("Running fastANI", file = sys.stderr)
-			file_list_name = listToFile(file_list, args.prefix)
-			file_results = "%s.tsv" % args.prefix
-			cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results, "-t", str(args.threads)]
-			rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
-			if rc != 0:
-				print("fastANI didn't work correctly.")
-				exit(1)
-
-		dist_dict = tableToDistDict(file_results, args.aairb)
+		dist_dict = calculateAI(args)
 
 	# Parse input files
 	if args.low_triangular_matrix:
-		dist_dict = ltmToDistDict(args.low_triangular_matrix)
+		dist_dict = ltmToDistDict(args.low_triangular_matrix, args.aairb)
 	if args.table:
 		dist_dict = tableToDistDict(args.table, args.aairb)
 
-	# Draw a heatmap with pyplot
-	if args.heatmap:
-		heatmapFromDist(dist_dict, args.prefix, args.plot_dendrogram)
+	# Clustering genomes, draw a heatmap and dendrogram with pyplot
+	clusterGenomes(dist_dict, args)
 
 	# Calculate Dendropy compatible phylogenetic distance matrix
 	pdm = pdmFromDistDict(dist_dict, args.prefix)
@@ -324,6 +374,8 @@ def main():
 			print(nj_tree.as_string(schema='newick', suppress_rooting = True), file = open("%s.nj.rooted.nwk" % args.prefix, 'w'))
 			if args.ascii_tree:
 				print(nj_tree.as_ascii_plot(plot_metric='length'), file = open("%s.nj.rooted.txt" % args.prefix, 'w'))
+
+	logger.info("Analysis finished")
 
 if __name__ == '__main__':
 	main()

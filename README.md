@@ -5,7 +5,7 @@ Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide ide
 
 ## Usage
 
-`genomic_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --aairb | --mummer | --fastani) [--input_list INPUT_LIST | --input_dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [--threads THREADS] [-H] [-A] [-d] [--reroot]`
+`genomic_distance_viz.py [-h] (-l LOW_TRIANGULAR_MATRIX | -t ANI_TABLE | --anirb | --aairb | --mummer | --fastani) [--input-list INPUT_LIST | --input-dir INPUT_DIR] [--extension EXTENSION] [-p PREFIX] [-m MODE] [--threads THREADS] [-H] [-A] [-d] [--reroot]`
 
 
 ### Command-line options
@@ -13,19 +13,19 @@ Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide ide
 ```
 -h, --help								Show this help message and exit
 
--l FILE, --low_triangular_matrix FILE   Low triangular matrix of ANI values
+-l FILE, --low-triangular-matrix FILE   Low triangular matrix of ANI values
 
 -t FILE, --table FILE					Tab separated table of similarity (ANI or AAI) between genomes
 
---anirb									Calculate ANI with ani.rb (should be installed separately) (slow). --input_list/--input_dir required
+--anirb									Calculate ANI with ani.rb (should be installed separately) (slow). --input-list/--input-dir required
 
 --fastani								Calculate ANI with fastANI (should be installed separately) (fast). --input_list/--input_dir required
 
 --mummer								Calculate ANI with mummer. --input_list/--input_dir required
 
---input_list FILE						List of full paths of genomes for ANI calculation
+--input-list FILE						List of full paths of genomes for ANI calculation
 
---input_dir DIRECTORY					Path (may be relative) to directory containig genomes for ANI calculation
+--input-dir DIRECTORY					Path (may be relative) to directory containig genomes for ANI calculation
 
 --extension STRING						Fasta files extension for use with --input_dir, e.g. fna (default), fa, fasta
 
@@ -37,9 +37,9 @@ Phylogenetic tree inference and heatmap drawing from ANI (average nucleotide ide
 
 -H, --heatmap							Draw a heatmap
 
--A, --ascii_tree						Draw ASCII tree to stdout
+-A, --ascii-tree						Draw ASCII tree to stdout
 
--d, --plot_dendrogram					Plot a dendrogram
+-d, --plot-dendrogram					Plot a dendrogram
 
 --reroot								Reroot tree at midpoint. May cause errors or incorrect trees
 ```
