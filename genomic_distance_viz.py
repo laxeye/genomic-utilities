@@ -20,15 +20,15 @@ AAI_NA_DISTANCE = 0.8
 PNG_DPI = 300
 
 
-def aniToDistance(ani):
+def ani_to_distance(ani):
 	return ANI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
 
 
-def aaiToDistance(ani):
-	return AAI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
+def aai_to_distance(aai):
+	return AAI_NA_DISTANCE if (aai == "NA") else ( 100 - float(aai) ) / 100.0
 
 
-def tableToDistDict(filename, is_aairb):
+def table_to_dist_dict(filename, is_aairb):
 	"""Returns genome distances in form of dict"""
 	dists = {}
 	ids = []
@@ -45,14 +45,14 @@ def tableToDistDict(filename, is_aairb):
 				dists[ref] = {}
 				ids.append(ref)
 
-			value = aaiToDistance(value) if is_aairb else aniToDistance(value)
+			value = aai_to_distance(value) if is_aairb else ani_to_distance(value)
 			dists[query][ref] = value
 			dists[ref][query] = value
 
 	return dists
 
 
-def ltmToDistDict(filename, is_aairb):
+def ltm_to_dist_dict(filename, is_aairb):
 	"""Returns genome distances in form of dict"""
 	try:
 		lines = open(filename, 'r').readlines()
@@ -71,12 +71,12 @@ def ltmToDistDict(filename, is_aairb):
 		ids.append(name)
 		dists[name] = {}
 		for i, v in enumerate(l):
-			dists[name][ids[i]] = aaiToDistance(v) if is_aairb else aniToDistance(v)
+			dists[name][ids[i]] = aai_to_distance(v) if is_aairb else ani_to_distance(v)
 
 	return dists
 
 
-def distDictToList(d):
+def dist_dict_to_2dlist(d):
 	"""Create two-dimensional list from dict"""
 	keys = list(d)
 	ani_list = []
@@ -98,13 +98,13 @@ def distDictToList(d):
 	return ani_list
 
 
-def printDistAsCSV(dists):
+def dist_as_csv(dists):
 	"""Create in-memory file object"""
 	inmem = io.StringIO()
 	keys = list(dists)
 	# 1st field [0,0] must be empty for Dendropy compatibility
 	print("," + ",".join(keys), file=inmem)
-	ani_list = distDictToList(dists)
+	ani_list = dist_dict_to_2dlist(dists)
 
 	for i, key in enumerate(keys):
 		t = list(map(str, ani_list[i]))
@@ -114,7 +114,8 @@ def printDistAsCSV(dists):
 	return inmem
 
 
-def plotDendrogram(lm, names, prefix):
+def plot_dendrogram(lm, names, prefix):
+	"""Plot dendrogram with pyplot"""
 	logger.info("Plotting dendrogram")
 	plt.figure(figsize=(10, 6), dpi=PNG_DPI)
 	plt.title("Distance-derived dendrogram")
@@ -124,24 +125,25 @@ def plotDendrogram(lm, names, prefix):
 	plt.savefig("%s.dendrogram.svg" % prefix)
 
 
-def clusterGenomes(dist_dict, args):
-	#Set colors for heatmap
-	COLOR_MAP = cm.RdGy
-
+def genomes_hclust(dist_dict, args):
+	"""Genomes hierarchical clustering and vizualisation"""
 	logger.info("Clustering genomes")
-	dist_arr = array( distDictToList(dist_dict) )
+	dist_arr = array( dist_dict_to_2dlist(dist_dict) )
 	names = array( list(dist_dict) )
 	lm = linkage(squareform(dist_arr), method="single", optimal_ordering=True)
 
 	if args.plot_dendrogram:
-		plotDendrogram(lm, names, args.prefix)
+		plot_dendrogram(lm, names, args.prefix)
+
+	order = leaves_list(lm)
+	dist_arr = dist_arr[order, ]
+	dist_arr = dist_arr[:, order]
+	names = names[order]
 
 	if args.print_clusters:
 		cluster_ids = fcluster(lm, t=args.cluster_threshold, criterion="distance")
 		clustered_genomes = list(zip(names, cluster_ids))
 		nodes, cluster_leader_ids = leaders(lm, cluster_ids)
-		logger.debug("Leader node and cluster id:")
-		logger.debug(list(zip(nodes, cluster_leader_ids)))
 		with open("%s.repr.clstr" % args.prefix, 'w') as handle:
 			for x in sorted(cluster_leader_ids):
 				g, c = [y for y in clustered_genomes if y[1] == x][0]
@@ -150,15 +152,18 @@ def clusterGenomes(dist_dict, args):
 			for genome, cluster_id in clustered_genomes:
 				handle.write("%s\t%s\n" % (genome, cluster_id))
 
-	order = leaves_list(lm)
-	dist_arr = dist_arr[order, ]
-	dist_arr = dist_arr[:, order]
-	names = names[order]
+	if args.heatmap:
+		plot_heatmap(args, names, dist_arr)
 
-	"""Plot heatmap"""
+
+def plot_heatmap(args, names, dist_arr):
+	"""Plot a heatmap on genomic distance data"""
+	logger.info("Plotting heatmap")
+	COLOR_MAP = cm.RdGy
+	genome_count = len(names)
 	fig, ax = plt.subplots()
-	ax.set_yticks( arange( len(dist_dict) ) )
-	ax.set_xticks( arange( len(dist_dict) ) )
+	ax.set_yticks(arange(genome_count))
+	ax.set_xticks(arange(genome_count))
 	ax.set_yticklabels(names, fontdict={'fontsize':'xx-small'})
 	ax.set_xticklabels(names, fontdict={'fontsize':'xx-small'})
 	plt.setp(ax.get_yticklabels(), rotation=0, ha="right", rotation_mode="anchor")
@@ -173,7 +178,7 @@ def clusterGenomes(dist_dict, args):
 
 def pdmFromDistDict(dist_dict, prefix):
 	"""Return phylogenetic distance matrix object from Dendropy"""
-	outputtmp = printDistAsCSV(dist_dict)
+	outputtmp = dist_as_csv(dist_dict)
 	outputtmp.seek(0) # Return to the first line
 	print(outputtmp.read(), file = open("%s.distances.csv" % prefix, 'w'))
 	
@@ -184,7 +189,7 @@ def pdmFromDistDict(dist_dict, prefix):
 	return pdm
 
 
-def checkExec(binary):
+def check_executable(binary):
 	try:
 		return subprocess.run(
 			[binary,'-h'],stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -214,7 +219,7 @@ def get_dnadiff_report(path1, path2, prefix="tmp"):
 		raise Exception("An error acquired during dnadiff execution!")
 
 
-def listToFile(l, prefix):
+def list_to_file(l, prefix):
 	"""Write list of analysing genomes"""
 	name = "%s.lst" % prefix
 	with open(name,'w') as f:
@@ -267,9 +272,9 @@ def what_to_run(args):
 		raise RuntimeError("Unknown executable provided!")
 
 
-def calculateAI(args):
+def calculate_AI(args):
 	binary = what_to_run(args)
-	if not checkExec(binary):
+	if not check_executable(binary):
 		logger.critical("Failed to run \'%s\'", binary)
 		sys.exit(1)
 
@@ -318,14 +323,18 @@ def calculateAI(args):
 	
 	if args.fastani:
 		logger.info("Running fastANI")
-		file_list_name = listToFile(file_list, args.prefix)
-		cmd = ["fastANI", "--ql", file_list_name, "--rl", file_list_name, "-o", file_results, "-t", str(args.threads)]
+		file_list_name = list_to_file(file_list, args.prefix)
+		cmd = ["fastANI",
+			"--ql", file_list_name,
+			"--rl", file_list_name,
+			"-o", file_results,
+			"-t", str(args.threads)]
 		rc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).returncode
 		if rc != 0:
 			logger.critical("fastANI didn't work correctly.")
 			raise RuntimeError("fastANI error")
 
-	return tableToDistDict(file_results, args.aairb)
+	return table_to_dist_dict(file_results, args.aairb)
 
 
 def main():
@@ -345,18 +354,26 @@ def main():
 	logger.info("Analysis started")
 
 	if (args.anirb or args.fastani or args.mummer or args.aairb):
-		dist_dict = calculateAI(args)
+		dist_dict = calculate_AI(args)
 
 	# Parse input files
 	if args.low_triangular_matrix:
-		dist_dict = ltmToDistDict(args.low_triangular_matrix, args.aairb)
+		dist_dict = ltm_to_dist_dict(args.low_triangular_matrix, args.aairb)
 	if args.table:
-		dist_dict = tableToDistDict(args.table, args.aairb)
+		dist_dict = table_to_dist_dict(args.table, args.aairb)
 
 	# Clustering genomes, draw a heatmap and dendrogram with pyplot
-	clusterGenomes(dist_dict, args)
+	genomes_hclust(dist_dict, args)
 
 	# Calculate Dendropy compatible phylogenetic distance matrix
+	if args.tree_method != "none":
+		tree_inference(args, dist_dict)
+		
+	logger.info("Analysis finished")
+
+
+def tree_inference(args, dist_dict):
+	logger.info("Phylogenetic tree inference")
 	pdm = pdmFromDistDict(dist_dict, args.prefix)
 
 	if (args.tree_method == "UPGMA" or args.tree_method == "both"):
@@ -381,7 +398,6 @@ def main():
 			if args.ascii_tree:
 				print(nj_tree.as_ascii_plot(plot_metric='length'), file = open("%s.nj.rooted.txt" % args.prefix, 'w'))
 
-	logger.info("Analysis finished")
 
 if __name__ == '__main__':
 	main()
