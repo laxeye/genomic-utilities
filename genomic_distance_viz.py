@@ -10,6 +10,7 @@ from matplotlib import cm
 from numpy import array, arange
 from scipy.cluster.hierarchy import dendrogram, linkage, leaves_list, fcluster, leaders
 import logging
+from scipy.spatial.distance import squareform, pdist
 
 
 #Set distance for unknown (low) ANI and AAI
@@ -117,7 +118,8 @@ def plotDendrogram(lm, names, prefix):
 	logger.info("Plotting dendrogram")
 	plt.figure(figsize=(10, 6), dpi=PNG_DPI)
 	plt.title("Distance-derived dendrogram")
-	dendrogram(lm, orientation='top', labels=names, distance_sort='descending', show_leaf_counts=True)
+	dendrogram(lm, orientation='top', labels=names,
+		distance_sort='descending', show_leaf_counts=True)
 	plt.savefig("%s.dendrogram.png" % prefix, dpi=PNG_DPI)
 	plt.savefig("%s.dendrogram.svg" % prefix)
 
@@ -129,14 +131,13 @@ def clusterGenomes(dist_dict, args):
 	logger.info("Clustering genomes")
 	dist_arr = array( distDictToList(dist_dict) )
 	names = array( list(dist_dict) )
-	lm = linkage(dist_arr, method="median", optimal_ordering=False)
+	lm = linkage(squareform(dist_arr), method="single", optimal_ordering=True)
 
 	if args.plot_dendrogram:
 		plotDendrogram(lm, names, args.prefix)
 
 	if args.print_clusters:
-		cluster_distance_t = 0.05
-		cluster_ids = fcluster(lm, t=cluster_distance_t, criterion="distance")
+		cluster_ids = fcluster(lm, t=args.cluster_threshold, criterion="distance")
 		clustered_genomes = list(zip(names, cluster_ids))
 		nodes, cluster_leader_ids = leaders(lm, cluster_ids)
 		logger.debug("Leader node and cluster id:")
@@ -171,7 +172,7 @@ def clusterGenomes(dist_dict, args):
 
 
 def pdmFromDistDict(dist_dict, prefix):
-	#Returns phylogenetic distance matrix object from Dendropy
+	"""Return phylogenetic distance matrix object from Dendropy"""
 	outputtmp = printDistAsCSV(dist_dict)
 	outputtmp.seek(0) # Return to the first line
 	print(outputtmp.read(), file = open("%s.distances.csv" % prefix, 'w'))
@@ -185,7 +186,9 @@ def pdmFromDistDict(dist_dict, prefix):
 
 def checkExec(binary):
 	try:
-		return subprocess.run([binary,'-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode is not None
+		return subprocess.run(
+			[binary,'-h'],stdout=subprocess.PIPE, stderr=subprocess.PIPE
+			).returncode is not None
 	except Exception as e:
 		raise e
 
@@ -212,6 +215,7 @@ def get_dnadiff_report(path1, path2, prefix="tmp"):
 
 
 def listToFile(l, prefix):
+	"""Write list of analysing genomes"""
 	name = "%s.lst" % prefix
 	with open(name,'w') as f:
 		f.write("\n".join(l))
@@ -234,13 +238,15 @@ def parse_args():
 	ingroup.add_argument("--input-dir", help="Path to directory containig genomes for distance calculation")
 	parser.add_argument("-x", "--extension", help="Fasta files extension, e.g. fna (default), fa, fasta", default="fna")
 
+	parser.add_argument("-d", "--use-diamond", help="Use diamond instead of BLAST in aai.rb", action="store_true")
 	parser.add_argument("-p", "--prefix", help="Prefix for output files", default="newprefix")
 	parser.add_argument("-m", "--tree-method", help="Phylogenetic tree inference method (default UPGMA)",
 		default="UPGMA", choices=["UPGMA", "NJ", "both", "none"])
 	parser.add_argument("-H", "--heatmap", help="Draw a heatmap", action="store_true")
 	parser.add_argument("-A", "--ascii-tree", help="Draw ASCII tree to stdout", action="store_true")
-	parser.add_argument("-d", "--plot-dendrogram", help="Plot a dendrogram", action="store_true")
-	parser.add_argument("-c", "--print-clusters", help="Print genomic clusters", action="store_true")
+	parser.add_argument("-D", "--plot-dendrogram", help="Plot a dendrogram", action="store_true")
+	parser.add_argument("-c", "--print-clusters", help="Print genomic clusters (experimental).", action="store_true")
+	parser.add_argument("--cluster-threshold", help="Threshold for genomic clusters output.", type=float, default=0.05)
 	parser.add_argument("--reroot", help="Reroot tree at midpoint. May cause errors or incorrect trees", action="store_true")
 	parser.add_argument("--threads", help="Number of CPU threads (where possible)", type=int, default=1)
 
@@ -292,15 +298,15 @@ def calculateAI(args):
 	if args.anirb or args.aairb or args.mummer:
 		results = []
 		logger.info("Running %s", binary)
-		#Generate list of pairs (Genome1, Genome2) for A*I calculating
-		pairs = [(file_list[i], file_list[j]) for i in range(len(file_list)) for j in range(i,len(file_list)) if i != j]
+		# Generate list of pairs (Genome1, Genome2) for A*I calculating excluding self alignment
+		pairs = [(file_list[i], file_list[j]) for i in range(len(file_list)) for j in range(i + 1, len(file_list))]
 		for (i, j) in pairs:
 			if args.mummer:
-				report = get_dnadiff_report(i,j)
+				report = get_dnadiff_report(i, j)
 				r = ani_from_report(report)
 			else:
 				cmd = [binary, "-1", i, "-2", j, "-a", "-q", "-t", str(args.threads)]
-				if args.aairb:
+				if args.aairb and args.use_diamond:
 					cmd = cmd + ['-p', 'diamond']
 				r = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.DEVNULL, text = True).stdout.strip()
 			if len(r) > 0:
