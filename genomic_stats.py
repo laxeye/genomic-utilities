@@ -78,7 +78,8 @@ def parse_args():
 
 	args = parser.parse_args()
 
-	if args.additional_metric >= 100 or args.additional_metric <= 0:
+	if args.additional_metric and (
+			args.additional_metric >= 100 or args.additional_metric <= 0):
 		print(f"Illegal metric value: {args.additional_metric}.",
 			file=sys.stderr)
 		raise ValueError("Illegal additional metric value!")
