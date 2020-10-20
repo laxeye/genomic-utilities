@@ -151,7 +151,7 @@ def genomes_hclust(dist_dict, args):
 				g, c = [y for y in clustered_genomes if y[1] == x][0]
 				handle.write("%s\t%s\n" % (g, c))
 		with open("%s.clstr" % args.prefix, 'w') as handle:
-			for genome, cluster_id in clustered_genomes:
+			for genome, cluster_id in sorted(clustered_genomes, key=lambda x: x[1]):
 				handle.write("%s\t%s\n" % (genome, cluster_id))
 
 	if args.heatmap:
