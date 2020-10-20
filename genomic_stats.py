@@ -7,6 +7,9 @@ import sys
 import json
 import argparse
 from Bio import SeqIO
+import sqlite3
+import os
+
 
 def get_N_L_metric(lengths, value=50):
 	'''Returns a tuple containing NX and LX metric'''
@@ -62,6 +65,18 @@ def write_assembly_stats(stats, prefix=None, s_format="human"):
 		print(f"{data}", file=dest)
 
 
+def write_to_db(stats, db, filename):
+	'''Write assembly stats to SQLite database'''
+	con = sqlite3.connect(db)
+	cur = con.cursor()
+	filename = os.path.basename(filename)
+	cur.execute("CREATE TABLE IF NOT EXISTS stats (genome, seq_count, total_length, max_length, N50, L50, N90, L90);")
+	cur.execute("INSERT INTO stats values (?,?,?,?,?,?,?,?)", (filename ,*stats.values()))
+	con.commit()
+	con.close()
+
+
+
 def parse_args():
 	'''Retruns parsed args'''
 	parser = argparse.ArgumentParser(description="Genome statistics")
@@ -75,6 +90,8 @@ def parse_args():
 	parser.add_argument("-X", "--additional-metric", type=int,
 		help="Additional metric to calculate Nx and Lx. "
 		+ "Integer between 1 and 99")
+	parser.add_argument("-s", "--sqlite-db",
+		help="Path to sqlite database to store data.")
 
 	args = parser.parse_args()
 
@@ -90,5 +107,7 @@ def parse_args():
 if __name__ == '__main__':
 	args = parse_args()
 	stats = assembly_stats(args.input, args.additional_metric)
+	if args.sqlite_db:
+		write_to_db(stats, args.sqlite_db, args.input)
 	write_assembly_stats(
 		stats, prefix=args.output_prefix, s_format=args.format)
