@@ -127,6 +127,22 @@ def plot_dendrogram(lm, names, prefix):
 	plt.savefig("%s.dendrogram.svg" % prefix)
 
 
+def genome_metric(line):
+	#Return (filename, completeness - contamination * 5)
+	words = line.split()
+	return words[0], float(words[-3]) - 5 * float(words[-2])
+
+
+def checkm_metrics(filename):
+	if os.path.exists(filename):
+		with open(filename, 'r') as f:
+			metrics = dict(map(genome_metric, f.readlines()[3:-1]))
+			return metrics
+	else:
+		logger.error("File %s doesn't exists", filename)
+		raise FileNotFoundError(filename)
+
+
 def genomes_hclust(dist_dict, args):
 	"""Genomes hierarchical clustering and vizualisation"""
 	logger.info("Clustering genomes")
@@ -144,15 +160,28 @@ def genomes_hclust(dist_dict, args):
 
 	if args.print_clusters:
 		cluster_ids = fcluster(lm, t=args.cluster_threshold, criterion="distance")
-		clustered_genomes = list(zip(names, cluster_ids))
-		nodes, cluster_leader_ids = leaders(lm, cluster_ids)
-		with open("%s.repr.clstr" % args.prefix, 'w') as handle:
-			for x in sorted(cluster_leader_ids):
-				g, c = [y for y in clustered_genomes if y[1] == x][0]
-				handle.write("%s\t%s\n" % (g, c))
+		clustered_genomes = sorted(list(zip(names, cluster_ids)), key=lambda x: x[1])
+		cluster_dict = dict()
 		with open("%s.clstr" % args.prefix, 'w') as handle:
-			for genome, cluster_id in sorted(clustered_genomes, key=lambda x: x[1]):
+			for genome, cluster_id in clustered_genomes:
 				handle.write("%s\t%s\n" % (genome, cluster_id))
+				if cluster_id in cluster_dict.keys():
+					cluster_dict[cluster_id].append(genome)
+				else:
+					cluster_dict[cluster_id] = [genome]
+
+		if args.checkm_file:
+			metrics = checkm_metrics(args.checkm_file)
+		else:
+			metrics = None
+		with open("%s.repr.clstr" % args.prefix, 'w') as handle:
+			for cluster_id, genomes in cluster_dict.items():
+				if len(genomes) == 1 or metrics is None:
+					handle.write("%s\t%s\n" % (genomes[0], cluster_id))
+				else:
+					cluster_metrics = sorted({x: metrics[x] for x in genomes}.items(), key=lambda x: -x[1])
+					#print(cluster_metrics)
+					handle.write("%s\t%s\n" % (cluster_metrics[0][0], cluster_id))
 
 	if args.heatmap:
 		plot_heatmap(args, names, dist_arr)
@@ -278,6 +307,9 @@ def parse_args():
 		help="Reroot tree at midpoint. May cause errors or incorrect trees")
 	parser.add_argument("--threads", type=int, default=1,
 		help="Number of CPU threads (where possible)")
+
+	parser.add_argument("--checkm-file",
+		help="Checkm output file to select best representative genome in cluster.")
 
 	return parser.parse_args()
 
