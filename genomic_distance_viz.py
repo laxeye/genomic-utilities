@@ -270,13 +270,13 @@ def parse_args():
 	group.add_argument("-t", "--table",
 		help="Tab separated table of distance values")
 	group.add_argument("--anirb", action="store_true",
-		help="Calculate ANI with ani.rb (slow). --input_list/--input_dir required")
+		help="Calculate ANI with ani.rb (slow). --input-list/--input-dir required")
 	group.add_argument("--mummer", action="store_true",
-		help="Calculate ANI with mummer. --input_list/--input_dir required")
+		help="Calculate ANI with mummer. --input-list/--input-dir required")
 	group.add_argument("--fastani", action="store_true",
-		help="Calculate ANI with fastANI (fast). --input_list/--input_dir required")
+		help="Calculate ANI with fastANI (fast). --input-list/--input-dir required")
 	group.add_argument("--aairb", action="store_true",
-		help="Calculate AAI with aai.rb (slow). --input_list/--input_dir required")
+		help="Calculate AAI with aai.rb (slow). --input-list/--input-dir required")
 
 	ingroup = parser.add_mutually_exclusive_group()
 	ingroup.add_argument("--input-list",
