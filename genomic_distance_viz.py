@@ -153,11 +153,6 @@ def genomes_hclust(dist_dict, args):
 	if args.plot_dendrogram:
 		plot_dendrogram(lm, names, args.prefix)
 
-	order = leaves_list(lm)
-	dist_arr = dist_arr[order, ]
-	dist_arr = dist_arr[:, order]
-	names = names[order]
-
 	if args.print_clusters:
 		cluster_ids = fcluster(lm, t=args.cluster_threshold, criterion="distance")
 		clustered_genomes = sorted(list(zip(names, cluster_ids)), key=lambda x: x[1])
@@ -184,6 +179,10 @@ def genomes_hclust(dist_dict, args):
 					handle.write("%s\t%s\n" % (cluster_metrics[0][0], cluster_id))
 
 	if args.heatmap:
+		order = leaves_list(lm)
+		dist_arr = dist_arr[order, ]
+		dist_arr = dist_arr[:, order]
+		names = names[order]
 		plot_heatmap(args, names, dist_arr)
 
 
