@@ -13,7 +13,7 @@ def parse_args():
 	parser.add_argument("-n", "--name", help="Sequence name", default="seq")
 	parser.add_argument("-m", "--mode", default='all',
 		help="Magic mode: all, rev, compl, revcompl",
-		choices=['all', 'rev', 'compl', 'rebcompl'])
+		choices=['all', 'rev', 'compl', 'revcompl'])
 	parser.add_argument("-k", "--keep", action="store_true", help="Keep input sequence")
 
 	args = parser.parse_args()
