@@ -8,6 +8,8 @@ import json
 import argparse
 import sqlite3
 import os
+import gzip
+import bz2
 from Bio import SeqIO
 from Bio.SeqUtils import GC
 
@@ -31,7 +33,25 @@ def assembly_stats(genome, extra=None):
 	GC content is rounded to two decimal places
 	'''
 	stats = dict()
-	seq_records = list(SeqIO.parse(genome, "fasta"))
+	extension = genome.split(".")[-1]
+	if extension == 'gz':
+		try:
+			handle = gzip.open(genome, 'rt')
+		except Exception as e:
+			raise e
+	elif extension == 'bz2':
+		try:
+			handle = bz2.open(genome, 'rt')
+		except Exception as e:
+			raise e
+	else:
+		try:
+			handle = open(genome, 'r')
+		except Exception as e:
+			raise e
+
+	seq_records = list(SeqIO.parse(handle, "fasta"))
+	handle.close()
 	lengths = sorted([len(record.seq) for record in seq_records], reverse=True)
 	stats['Filename'] = os.path.basename(genome)
 	stats['GC'] = "{:.2f}".format(round(GC(''.join(map(lambda it: str(it.seq), seq_records))), 2))
@@ -134,10 +154,14 @@ def main():
 	file_list = []
 	if os.path.isdir(args.input):
 		for file in os.scandir(os.path.realpath(args.input)):
-			if (file.is_file() and (
-				not args.extension or file.name.split(".")[-1] == args.extension
-			)):
-				file_list.append(file.path)
+			if file.is_file():
+				extension = file.name.split(".")[-1]
+				if extension in ['gz', 'bz2']:
+					extension = file.name.split(".")[-2]
+				if (not args.extension
+					or extension == args.extension
+				):
+					file_list.append(file.path)
 	else:
 		file_list.append(args.input)
 
