@@ -13,7 +13,7 @@ import logging
 from scipy.spatial.distance import squareform
 
 
-"""Set distance for unknown (low) ANI and AAI"""
+"""Set distance for unknown (too low) ANI and AAI"""
 ANI_NA_DISTANCE = 0.3
 AAI_NA_DISTANCE = 0.8
 
@@ -22,11 +22,11 @@ PNG_DPI = 300
 
 
 def ani_to_distance(ani):
-	return ANI_NA_DISTANCE if (ani == "NA") else ( 100 - float(ani) ) / 100.0
+	return ANI_NA_DISTANCE if (ani is None) else ( 100 - float(ani) ) / 100.0
 
 
 def aai_to_distance(aai):
-	return AAI_NA_DISTANCE if (aai == "NA") else ( 100 - float(aai) ) / 100.0
+	return AAI_NA_DISTANCE if (aai is None) else ( 100 - float(aai) ) / 100.0
 
 
 def table_to_dist_dict(filename, is_aairb):
@@ -128,19 +128,9 @@ def plot_dendrogram(lm, names, prefix):
 
 
 def genome_metric(line):
-	#Return (filename, completeness - contamination * 5)
+	"""Return (filename, completeness - contamination * 5)"""
 	words = line.split()
 	return words[0], float(words[-3]) - 5 * float(words[-2])
-
-
-def checkm_metrics(filename):
-	if os.path.exists(filename):
-		with open(filename, 'r') as f:
-			metrics = dict(map(genome_metric, f.readlines()[3:-1]))
-			return metrics
-	else:
-		logger.error("File %s doesn't exists", filename)
-		raise FileNotFoundError(filename)
 
 
 def genomes_hclust(dist_dict, args):
@@ -165,17 +155,17 @@ def genomes_hclust(dist_dict, args):
 				else:
 					cluster_dict[cluster_id] = [genome]
 
+		metrics = None
 		if args.checkm_file:
-			metrics = checkm_metrics(args.checkm_file)
-		else:
-			metrics = None
+			with open(filename, 'r') as f:
+				metrics = dict(map(genome_metric, f.readlines()[3:-1]))
+
 		with open("%s.repr.clstr" % args.prefix, 'w') as handle:
 			for cluster_id, genomes in cluster_dict.items():
 				if len(genomes) == 1 or metrics is None:
 					handle.write("%s\t%s\n" % (genomes[0], cluster_id))
 				else:
 					cluster_metrics = sorted({x: metrics[x] for x in genomes}.items(), key=lambda x: -x[1])
-					#print(cluster_metrics)
 					handle.write("%s\t%s\n" % (cluster_metrics[0][0], cluster_id))
 
 	if args.heatmap:
@@ -220,35 +210,31 @@ def pdmFromDistDict(dist_dict, prefix):
 
 
 def check_executable(binary):
-	"""Returns True if binary is runable"""
 	try:
-		return subprocess.run(
+		subprocess.run(
 			[binary, '-h'],
-			stdout=subprocess.PIPE, stderr=subprocess.PIPE
-		).returncode is not None
-	except Exception as e:
+			stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+		)
+	except subprocess.CalledProcessError as e:
+		logger.critical("Failed to run %s", binary)
 		raise e
 
 
-def ani_from_report(filename):
-	"""Return ANI value from dnadiff report"""
-	with open(filename) as f:
-		for line in f:
-			words = line.rstrip().split()
-			if len(words) > 0 and words[0] == "AvgIdentity":
-				return (words[1])
-		else:
-			return "NA"
-
-
-def get_dnadiff_report(path1, path2, prefix="tmp"):
+def get_dnadiff_ani(path1, path2, prefix="tmp"):
 	"""Run dnadiff and retrun path to report"""
 	cmd = ["dnadiff", "-p", prefix, path1, path2]
-	r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	if r.returncode == 0:
-		return "%s.report" % prefix
-	else:
-		raise Exception("An error acquired during dnadiff execution!")
+	try:
+		subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+		with open("%s.report" % prefix) as f:
+			for line in f:
+				words = line.rstrip().split()
+				if len(words) > 0 and words[0] == "AvgIdentity":
+					return (words[1])
+			else:
+				return None
+	except subprocess.CalledProcessError as e:
+		logger.critical("An error acquired during dnadiff execution!")
+		raise e
 
 
 def list_to_file(data, prefix):
@@ -282,11 +268,11 @@ def parse_args():
 		help="List of genomes with full path for distance calculation")
 	ingroup.add_argument("--input-dir",
 		help="Path to directory containig genomes for distance calculation")
+
 	parser.add_argument("-x", "--extension", default="fna",
 		help="Fasta files extension, e.g. fna (default), fa, fasta")
-
 	parser.add_argument("-d", "--use-diamond", action="store_true",
-		help="Use diamond instead of BLAST in aai.rb")
+		help="Use diamond instead of BLAST in aai.rb (faster)")
 	parser.add_argument("-p", "--prefix", default="newprefix",
 		help="Prefix for output files")
 	parser.add_argument("-m", "--tree-method",
@@ -299,18 +285,24 @@ def parse_args():
 	parser.add_argument("-D", "--plot-dendrogram", action="store_true",
 		help="Plot a dendrogram")
 	parser.add_argument("-c", "--print-clusters", action="store_true",
-		help="Print genomic clusters (experimental).")
+		help="Cluster genomes by distance")
 	parser.add_argument("--cluster-threshold", type=float, default=0.05,
-		help="Threshold for genomic clusters output.")
+		help="Threshold for genome clustering (default 0.05)")
 	parser.add_argument("--reroot", action="store_true",
 		help="Reroot tree at midpoint. May cause errors or incorrect trees")
 	parser.add_argument("--threads", type=int, default=1,
-		help="Number of CPU threads (where possible)")
+		help="Number of CPU threads (where multi-threading is possible)")
 
 	parser.add_argument("--checkm-file",
 		help="Checkm output file to select best representative genome in cluster.")
 
-	return parser.parse_args()
+	args = parser.parse_args()
+
+	if args.checkm_file and not os.path.exists(args.checkm_file):
+		logger.error("CheckM report %s doesn't exists", args.checkm_file)
+		raise FileNotFoundError(args.checkm_file)
+
+	return args
 
 
 def what_to_run(args):
@@ -327,11 +319,10 @@ def what_to_run(args):
 		raise RuntimeError("Unknown executable provided!")
 
 
-def calculate_AI(args):
+def calculate_AI_table(args):
+	"""Returns dict of genomic distances"""
 	binary = what_to_run(args)
-	if not check_executable(binary):
-		logger.critical("Failed to run \'%s\'", binary)
-		sys.exit(1)
+	check_executable(binary)
 
 	file_results = "%s.tsv" % args.prefix
 
@@ -362,8 +353,7 @@ def calculate_AI(args):
 		pairs = [(file_list[i], file_list[j]) for i in range(len(file_list)) for j in range(i + 1, len(file_list))]
 		for (i, j) in pairs:
 			if args.mummer:
-				report = get_dnadiff_report(i, j)
-				r = ani_from_report(report)
+				r = get_dnadiff_ani(i, j)
 			else:
 				cmd = [binary, "-1", i, "-2", j, "-a", "-q", "-t", str(args.threads)]
 				if args.aairb and args.use_diamond:
@@ -390,14 +380,15 @@ def calculate_AI(args):
 			"--rl", file_list_name,
 			"-o", file_results,
 			"-t", str(args.threads)]
-		rc = subprocess.run(
-			cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-		).returncode
-		if rc != 0:
+		try:
+			subprocess.run(
+				cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+			)
+		except subprocess.CalledProcessError as e:
 			logger.critical("fastANI didn't work correctly.")
-			raise RuntimeError("fastANI error")
+			raise e
 
-	return table_to_dist_dict(file_results, args.aairb)
+	return file_results
 
 
 def main():
@@ -416,14 +407,14 @@ def main():
 	logger.addHandler(fh)
 	logger.info("Analysis started")
 
-	if (args.anirb or args.fastani or args.mummer or args.aairb):
-		dist_dict = calculate_AI(args)
 
 	# Parse input files
 	if args.low_triangular_matrix:
 		dist_dict = ltm_to_dist_dict(args.low_triangular_matrix, args.aairb)
-	if args.table:
+	elif args.table:
 		dist_dict = table_to_dist_dict(args.table, args.aairb)
+	else:
+		dist_dict = table_to_dist_dict(calculate_AI_table(args), args.aairb)
 
 	# Clustering genomes, draw a heatmap and dendrogram with pyplot
 	genomes_hclust(dist_dict, args)

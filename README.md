@@ -39,7 +39,7 @@ Path (may be relative) to directory containig genomes for ANI calculation
 Fasta files extension, e.g. fna (default), fa, fasta
 
 -d, --use-diamond
-Use diamond instead of BLAST in aai.rb
+Use diamond instead of BLAST in aai.rb (faster)
 
 -p PREFIX, --prefix PREFIX
 Prefix for output files
@@ -57,7 +57,7 @@ Draw ASCII tree to stdout
 Plot a dendrogram
 
 -c, --print-clusters
-Print genomic clusters (experimental)
+Print genomic clusters to file
 
 --cluster-threshold CLUSTER_THRESHOLD
 Threshold for genomic clusters output
@@ -67,6 +67,9 @@ Reroot tree at midpoint. May cause errors or incorrect trees
 
 --threads THREADS
 Number of CPU threads (where possible)
+
+--checkm-file CHECKM_FILE
+Checkm output file to select best representative genome in cluster.
 ```
 
 
@@ -125,9 +128,11 @@ Basic genome statistics retreived with BioPython.
 
 ## Usage
 
-`genomic_stats.py [-h] -i INPUT [-o OUTPUT_PREFIX] [-w]
-                        [-f {human,json,table}] [-X ADDITIONAL_METRIC]
-                        [-s SQLITE_DB] [-e EXTENSION] [-b]`
+```
+genomic_stats.py [-h] -i INPUT [-o OUTPUT_PREFIX] [-w]
+                 [-f {human,json,table}] [-X ADDITIONAL_METRIC]
+                 [-s SQLITE_DB] [-e EXTENSION] [-b]
+```
 
 Arguments:
 -h, --help  
