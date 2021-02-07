@@ -26,13 +26,7 @@ def get_metric(lengths, value=50):
 	return None, None
 
 
-def assembly_stats(genome, extra=None):
-	'''Returns a dict containing genome stats.
-
-	Additional metric extra (int) may be provided to calculate Nx and Lx.
-	GC content is rounded to two decimal places
-	'''
-	stats = dict()
+def load_genome(genome):
 	extension = genome.split(".")[-1]
 	if extension == 'gz':
 		try:
@@ -49,14 +43,30 @@ def assembly_stats(genome, extra=None):
 			handle = open(genome, 'r')
 		except Exception as e:
 			raise e
+	return handle
 
-	seq_records = list(SeqIO.parse(handle, "fasta"))
+
+def assembly_stats(genome, extra=None):
+	'''Returns a dict containing genome stats.
+
+	Additional metric extra (int) may be provided to calculate Nx and Lx.
+	GC content is rounded to two decimal places
+	'''
+	stats = dict()
+	handle = load_genome(genome)
+	lengths, gcs, Ns = list(zip(*[(
+		len(record),
+		GC(record.seq) * len(record),
+		record.seq.count('N')
+	) for record in SeqIO.parse(handle, "fasta")]))
 	handle.close()
-	lengths = sorted([len(record.seq) for record in seq_records], reverse=True)
+	gc_total = round(sum(gcs) / sum(lengths), 2)
+	lengths = sorted(lengths, reverse=True)
 	stats['Filename'] = os.path.basename(genome)
-	stats['GC'] = "{:.2f}".format(round(GC(''.join(map(lambda it: str(it.seq), seq_records))), 2))
+	stats['GC'] = "{:.2f}".format(gc_total)
 	stats['Sequence count'] = len(lengths)
 	stats['Total length'] = sum(lengths)
+	stats['Ambiguous bases'] = sum(Ns)
 	stats['Max length'] = lengths[0]
 	stats['N50'], stats['L50'] = get_metric(lengths, 50)
 	stats['N90'], stats['L90'] = get_metric(lengths, 90)
@@ -102,9 +112,11 @@ def write_to_db(stats, db):
 	'''Write assembly stats to SQLite database'''
 	con = sqlite3.connect(db)
 	cur = con.cursor()
-	cur.execute("CREATE TABLE IF NOT EXISTS stats (filename, GC, seq_count, total_length, max_length, N50, L50, N90, L90);")
+	cur.execute("CREATE TABLE IF NOT EXISTS stats "
+		+ "(filename, GC, seq_count, total_length, ambiguous, max_length, N50, L50, N90, L90);"
+	)
 	for genome in stats:
-		cur.execute("INSERT INTO stats values (?,?,?,?,?,?,?,?,?)", tuple(genome.values()))
+		cur.execute("INSERT INTO stats values (?,?,?,?,?,?,?,?,?,?)", tuple(genome.values())[:10])
 	con.commit()
 	con.close()
 
@@ -141,7 +153,8 @@ def parse_args():
 	if args.basename_as_prefix and not args.prefix:
 		args.prefix = os.path.basename(args.input)
 	if args.additional_metric and (
-			args.additional_metric >= 100 or args.additional_metric <= 0):
+		args.additional_metric >= 100 or args.additional_metric <= 0
+	):
 		print(f"Illegal metric value: {args.additional_metric}.",
 			file=sys.stderr)
 		raise ValueError("Illegal additional metric value!")

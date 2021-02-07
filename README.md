@@ -121,26 +121,42 @@ AssertionError`
 
 # `genomic_stats.py`
 
-basic genome statistics retreived with BioPython.
+Basic genome statistics retreived with BioPython.
 
 ## Usage
 
-`genomic_stats.py [-h] -i INPUT [-o OUTPUT_PREFIX] [-f {human,json,table}] [-X ADDITIONAL_METRIC]`
+`genomic_stats.py [-h] -i INPUT [-o OUTPUT_PREFIX] [-w]
+                        [-f {human,json,table}] [-X ADDITIONAL_METRIC]
+                        [-s SQLITE_DB] [-e EXTENSION] [-b]`
 
 Arguments:
+-h, --help  
+show help message and exit
 
 -i INPUT, --input INPUT  
-Input file in FASTA format.
+Input file in FASTA format or directory.
 
 -o OUTPUT_PREFIX, --output-prefix OUTPUT_PREFIX  
-Output prefix. Skip it to print to stdout.
+Output prefix. Skip it to print to stdout. If file already exists output will be appended.
+
+-w, --overwrite  
+Overwrite output file.
 
 -f {human,json,table}, --format {human,json,table}  
-Output format: human (human-fiendly, default), json,
-table (tab-delimited).
+Output format: human (human-fiendly, default), json, table (tab-delimited).
 
 -X ADDITIONAL_METRIC, --additional-metric ADDITIONAL_METRIC  
-Additional metric to calculate Nx and Lx. Integer between 1 and 99
+Additional metric to calculate Nx and Lx. Integer between 1 and 99.
+
+-s SQLITE_DB, --sqlite-db SQLITE_DB  
+Path to sqlite database to store data.
+
+-e EXTENSION, --extension EXTENSION  
+File extension if directory was provided. By default any file will be processed.
+
+-b, --basename-as-prefix  
+Ouput file prefix will be taken from input file or directory.
+
 
 ## Requirements
 
