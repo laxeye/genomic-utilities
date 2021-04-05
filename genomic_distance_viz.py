@@ -157,7 +157,7 @@ def genomes_hclust(dist_dict, args):
 
 		metrics = None
 		if args.checkm_file:
-			with open(filename, 'r') as f:
+			with open(args.checkm_file, 'r') as f:
 				metrics = dict(map(genome_metric, f.readlines()[3:-1]))
 
 		with open("%s.repr.clstr" % args.prefix, 'w') as handle:
@@ -165,7 +165,7 @@ def genomes_hclust(dist_dict, args):
 				if len(genomes) == 1 or metrics is None:
 					handle.write("%s\t%s\n" % (genomes[0], cluster_id))
 				else:
-					cluster_metrics = sorted({x: metrics[x] for x in genomes}.items(), key=lambda x: -x[1])
+					cluster_metrics = sorted({x: metrics[ os.path.splitext(x)[0] ] for x in genomes}.items(), key=lambda x: -x[1])
 					handle.write("%s\t%s\n" % (cluster_metrics[0][0], cluster_id))
 
 	if args.heatmap:
