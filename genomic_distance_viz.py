@@ -119,10 +119,12 @@ def dist_as_csv(dists):
 def plot_dendrogram(lm, names, prefix):
 	"""Plot dendrogram with pyplot"""
 	logger.info("Plotting dendrogram")
-	plt.figure(figsize=(10, 6), dpi=PNG_DPI)
+	fig = plt.figure(figsize=(12, 6), dpi=PNG_DPI)
 	plt.title("Distance-derived dendrogram")
-	dendrogram(lm, orientation='top', labels=names,
+	dendrogram(lm, orientation='right', labels=names,
+		above_threshold_color='#bcbcbc',
 		distance_sort='descending', show_leaf_counts=True)
+	fig.tight_layout()
 	plt.savefig("%s.dendrogram.png" % prefix, dpi=PNG_DPI)
 	plt.savefig("%s.dendrogram.svg" % prefix)
 
