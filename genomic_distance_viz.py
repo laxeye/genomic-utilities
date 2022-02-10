@@ -257,20 +257,16 @@ def parse_args():
 	group.add_argument("-t", "--table",
 		help="Tab separated table of distance values")
 	group.add_argument("--anirb", action="store_true",
-		help="Calculate ANI with ani.rb (slow). --input-list/--input-dir required")
+		help="Calculate ANI with ani.rb (slow). --input required")
 	group.add_argument("--mummer", action="store_true",
-		help="Calculate ANI with mummer. --input-list/--input-dir required")
+		help="Calculate ANI with mummer. --input required")
 	group.add_argument("--fastani", action="store_true",
-		help="Calculate ANI with fastANI (fast). --input-list/--input-dir required")
+		help="Calculate ANI with fastANI (fast). --input required")
 	group.add_argument("--aairb", action="store_true",
-		help="Calculate AAI with aai.rb (slow). --input-list/--input-dir required")
+		help="Calculate AAI with aai.rb (slow). --input required")
 
-	ingroup = parser.add_mutually_exclusive_group()
-	ingroup.add_argument("--input-list",
-		help="List of genomes with full path for distance calculation")
-	ingroup.add_argument("--input-dir",
-		help="Path to directory containig genomes for distance calculation")
-
+	parser.add_argument("-i", "--input",
+		help="List of genomes with full path or path to directory containig genomes.")
 	parser.add_argument("-x", "--extension", default="fna",
 		help="Fasta files extension, e.g. fna (default), fa, fasta")
 	parser.add_argument("-d", "--use-diamond", action="store_true",
@@ -329,16 +325,19 @@ def calculate_AI_table(args):
 	file_results = "%s.tsv" % args.prefix
 
 	file_list = []
-	if args.input_list:
-		f = open(args.input_list)
-		for line in f.readlines():
-			line = line.strip()
-			if (os.path.exists(line) and line.split(".")[-1] == args.extension):
-				file_list.append(os.path.realpath(line))
-	elif args.input_dir:
-		for file in os.scandir(os.path.realpath(args.input_dir)):
+	if os.path.isdir(args.input):
+		for file in os.scandir(os.path.realpath(args.input)):
 			if (file.is_file() and file.name.split(".")[-1] == args.extension):
 				file_list.append(file.path)
+	elif os.path.isfile(args.input):
+		f = open(args.input)
+		for line in f.readlines():
+			line = line.strip()
+			if not os.path.exists(line):
+				logger.warning("File %s not found.", line)
+			if line.split(".")[-1] == args.extension:
+				file_list.append(os.path.realpath(line))
+		f.close()
 	else:
 		logger.critical("Genomes are not provided. Exiting.")
 		sys.exit(1)
