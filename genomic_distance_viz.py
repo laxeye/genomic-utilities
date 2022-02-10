@@ -274,8 +274,8 @@ def parse_args():
 	parser.add_argument("-p", "--prefix", default="newprefix",
 		help="Prefix for output files")
 	parser.add_argument("-m", "--tree-method",
-		default="UPGMA", choices=["UPGMA", "NJ", "both", "none"],
-		help="Phylogenetic tree inference method (default UPGMA)")
+		default="none", choices=["UPGMA", "NJ", "both", "none"],
+		help="Phylogenetic tree inference method (default none)")
 	parser.add_argument("-H", "--heatmap", action="store_true",
 		help="Draw a heatmap")
 	parser.add_argument("-A", "--ascii-tree", action="store_true",
