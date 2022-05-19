@@ -122,7 +122,7 @@ def write_to_db(stats, db):
 
 
 def parse_args():
-	'''Retruns parsed args'''
+	'''Returns parsed args'''
 	parser = argparse.ArgumentParser(description="Genome statistics")
 	parser.add_argument("-i", "--input", required=True,
 		help="Input file in FASTA format or directory.")
