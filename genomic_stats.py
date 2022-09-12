@@ -179,6 +179,7 @@ def main():
 		file_list.append(args.input)
 
 	stats = [assembly_stats(genome, args.additional_metric) for genome in file_list]
+	stats.sort(key=lambda x: x['Filename'])
 	write_assembly_stats(stats, args)
 	if args.sqlite_db:
 		write_to_db(stats, args.sqlite_db)
