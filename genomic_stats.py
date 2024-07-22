@@ -11,7 +11,7 @@ import os
 import gzip
 import bz2
 from Bio import SeqIO
-from Bio.SeqUtils import GC
+from Bio.SeqUtils import gc_fraction
 
 
 def get_metric(lengths, value=50):
@@ -56,7 +56,7 @@ def assembly_stats(genome, extra=None):
 	handle = load_genome(genome)
 	lengths, gcs, Ns = list(zip(*[(
 		len(record),
-		GC(record.seq) * len(record),
+		gc_fraction(record.seq) * len(record) * 100,
 		record.seq.count('N')
 	) for record in SeqIO.parse(handle, "fasta")]))
 	handle.close()
